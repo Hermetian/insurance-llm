@@ -184,6 +184,12 @@ function App() {
   const [waitlistEmail, setWaitlistEmail] = useState('')
   const [emailSubmitted, setEmailSubmitted] = useState(false)
 
+  // Disclaimer modal
+  const [showDisclaimerModal, setShowDisclaimerModal] = useState(false)
+  const [disclaimerInput, setDisclaimerInput] = useState('')
+  const [disclaimerAccepted, setDisclaimerAccepted] = useState(false)
+  const [pendingAnalysis, setPendingAnalysis] = useState<'coi' | 'lease' | null>(null)
+
   const classifyDocument = async (text: string): Promise<ClassifyResult | null> => {
     setClassifying(true)
     try {
@@ -300,19 +306,54 @@ function App() {
     if (!docText.trim()) return
 
     // If no classification yet, classify first
-    if (!docType) {
+    let currentDocType = docType
+    if (!currentDocType) {
       const classification = await classifyDocument(docText)
       handleClassification(classification)
       if (!classification?.supported) return
       setDocType(classification)
+      currentDocType = classification
+    }
+
+    // If disclaimer not yet accepted, show the modal
+    if (!disclaimerAccepted) {
+      if (currentDocType?.document_type === 'coi') {
+        setPendingAnalysis('coi')
+      } else if (currentDocType?.document_type === 'lease') {
+        setPendingAnalysis('lease')
+      }
+      setShowDisclaimerModal(true)
+      setDisclaimerInput('')
+      return
     }
 
     // Route to appropriate analyzer
-    if (docType?.document_type === 'coi') {
+    if (currentDocType?.document_type === 'coi') {
       await analyzeCOI()
-    } else if (docType?.document_type === 'lease') {
+    } else if (currentDocType?.document_type === 'lease') {
       await analyzeLease()
     }
+  }
+
+  const handleDisclaimerSubmit = async () => {
+    if (disclaimerInput.toLowerCase().trim() === 'not legal advice') {
+      setDisclaimerAccepted(true)
+      setShowDisclaimerModal(false)
+
+      // Run the pending analysis
+      if (pendingAnalysis === 'coi') {
+        await analyzeCOI()
+      } else if (pendingAnalysis === 'lease') {
+        await analyzeLease()
+      }
+      setPendingAnalysis(null)
+    }
+  }
+
+  const handleDisclaimerCancel = () => {
+    setShowDisclaimerModal(false)
+    setPendingAnalysis(null)
+    // Don't set disclaimerAccepted - they can try again
   }
 
   const analyzeCOI = async () => {
@@ -384,6 +425,9 @@ function App() {
     setShowUnsupportedModal(false)
     setWaitlistEmail('')
     setEmailSubmitted(false)
+    setDisclaimerAccepted(false)
+    setDisclaimerInput('')
+    setPendingAnalysis(null)
   }
 
   const getStatusColor = (status: string) => {
@@ -904,6 +948,44 @@ function App() {
           </section>
         )}
       </main>
+
+      {/* Disclaimer Modal */}
+      {showDisclaimerModal && (
+        <div className="modal-overlay">
+          <div className="modal disclaimer-modal">
+            <div className="modal-header">
+              <span className="modal-icon">[!]</span>
+              <h2>HOLD UP</h2>
+            </div>
+            <div className="modal-content">
+              <p>Hey! I'm trying my best here but <strong>I'm not a lawyer</strong> and neither is the AI!</p>
+              <p>This tool is for <strong>educational purposes only</strong>. It might miss things. It might be wrong. Real legal and insurance decisions need real professionals.</p>
+              <p className="modal-cta">Type <strong>"not legal advice"</strong> to confirm you understand:</p>
+              <input
+                type="text"
+                className="pixel-input"
+                placeholder="not legal advice"
+                value={disclaimerInput}
+                onChange={(e) => setDisclaimerInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleDisclaimerSubmit()}
+                autoFocus
+              />
+              <div className="modal-buttons">
+                <button
+                  className="pixel-btn primary"
+                  onClick={handleDisclaimerSubmit}
+                  disabled={disclaimerInput.toLowerCase().trim() !== 'not legal advice'}
+                >
+                  [GOT IT]
+                </button>
+                <button className="pixel-btn secondary" onClick={handleDisclaimerCancel}>
+                  [BACK]
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Unsupported Document Modal */}
       {showUnsupportedModal && (

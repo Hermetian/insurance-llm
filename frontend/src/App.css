@@ -1117,3 +1117,27 @@ body {
 .data-card.info h3 {
   color: var(--pixel-accent-2);
 }
+
+/* DISCLAIMER MODAL */
+.disclaimer-modal {
+  max-width: 500px;
+}
+
+.disclaimer-modal .modal-header {
+  background: var(--pixel-yellow);
+}
+
+.disclaimer-modal .modal-icon {
+  color: var(--pixel-text);
+}
+
+.disclaimer-modal .pixel-input {
+  text-align: center;
+  font-size: 18px;
+  letter-spacing: 1px;
+}
+
+.disclaimer-modal .pixel-btn.primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
