@@ -186,6 +186,113 @@ class Coverage(BaseModel):
     deductible: Optional[str] = None
     notes: Optional[str] = None
 
+# COI Compliance Checker Models
+class COIData(BaseModel):
+    insured_name: Optional[str] = None
+    policy_number: Optional[str] = None
+    carrier: Optional[str] = None
+    effective_date: Optional[str] = None
+    expiration_date: Optional[str] = None
+    gl_limit_per_occurrence: Optional[str] = None
+    gl_limit_aggregate: Optional[str] = None
+    workers_comp: bool = False
+    auto_liability: bool = False
+    umbrella_limit: Optional[str] = None
+    additional_insured_checked: bool = False
+    waiver_of_subrogation_checked: bool = False
+    primary_noncontributory: bool = False
+    certificate_holder: Optional[str] = None
+    description_of_operations: Optional[str] = None
+    cg_20_10_endorsement: bool = False
+    cg_20_37_endorsement: bool = False
+
+class ComplianceRequirement(BaseModel):
+    name: str
+    required_value: str
+    actual_value: str
+    status: str  # "pass", "fail", "warning"
+    explanation: str
+
+class ComplianceReport(BaseModel):
+    overall_status: str  # "compliant", "non-compliant", "needs-review"
+    coi_data: COIData
+    critical_gaps: list[ComplianceRequirement] = []
+    warnings: list[ComplianceRequirement] = []
+    passed: list[ComplianceRequirement] = []
+    risk_exposure: str
+    fix_request_letter: str
+
+    def __init__(self, **data):
+        for field in ['critical_gaps', 'warnings', 'passed']:
+            if data.get(field) is None:
+                data[field] = []
+        super().__init__(**data)
+
+class COIComplianceInput(BaseModel):
+    coi_text: str
+    project_type: Optional[str] = None  # preset project type
+    custom_requirements: Optional[dict] = None  # custom requirements
+
+# Preset project types with their requirements
+PROJECT_TYPE_REQUIREMENTS = {
+    "commercial_construction": {
+        "name": "Commercial Construction",
+        "gl_per_occurrence": 1000000,
+        "gl_aggregate": 2000000,
+        "umbrella_required": True,
+        "umbrella_minimum": 2000000,
+        "workers_comp_required": True,
+        "auto_liability_required": True,
+        "additional_insured_required": True,
+        "waiver_of_subrogation_required": True,
+        "primary_noncontributory_required": True,
+        "cg_20_10_required": True,
+        "cg_20_37_required": True,
+    },
+    "residential_construction": {
+        "name": "Residential Construction",
+        "gl_per_occurrence": 500000,
+        "gl_aggregate": 1000000,
+        "umbrella_required": False,
+        "umbrella_minimum": 0,
+        "workers_comp_required": True,
+        "auto_liability_required": True,
+        "additional_insured_required": True,
+        "waiver_of_subrogation_required": False,
+        "primary_noncontributory_required": False,
+        "cg_20_10_required": False,
+        "cg_20_37_required": False,
+    },
+    "government_municipal": {
+        "name": "Government/Municipal",
+        "gl_per_occurrence": 2000000,
+        "gl_aggregate": 4000000,
+        "umbrella_required": True,
+        "umbrella_minimum": 5000000,
+        "workers_comp_required": True,
+        "auto_liability_required": True,
+        "additional_insured_required": True,
+        "waiver_of_subrogation_required": True,
+        "primary_noncontributory_required": True,
+        "cg_20_10_required": True,
+        "cg_20_37_required": True,
+    },
+    "industrial_manufacturing": {
+        "name": "Industrial/Manufacturing",
+        "gl_per_occurrence": 2000000,
+        "gl_aggregate": 4000000,
+        "umbrella_required": True,
+        "umbrella_minimum": 5000000,
+        "workers_comp_required": True,
+        "auto_liability_required": True,
+        "additional_insured_required": True,
+        "waiver_of_subrogation_required": True,
+        "primary_noncontributory_required": True,
+        "cg_20_10_required": True,
+        "cg_20_37_required": True,
+    },
+}
+
 class ExtractedPolicy(BaseModel):
     insured_name: Optional[str] = None
     policy_number: Optional[str] = None
@@ -206,6 +313,102 @@ class ExtractedPolicy(BaseModel):
             if data.get(field) is None:
                 data[field] = []
         super().__init__(**data)
+
+COI_EXTRACTION_PROMPT = """You are an expert insurance document analyst specializing in Certificates of Insurance (ACORD 25 forms).
+
+Extract structured data from this COI document. Be thorough and precise - this data will be used for compliance checking.
+
+Return a JSON object with these fields:
+- insured_name: Name of the insured party (the subcontractor/vendor)
+- policy_number: Policy number(s) if present
+- carrier: Insurance carrier/company name
+- effective_date: Policy start date (format: YYYY-MM-DD if possible)
+- expiration_date: Policy end date (format: YYYY-MM-DD if possible)
+- gl_limit_per_occurrence: General liability per occurrence limit (e.g., "$1,000,000")
+- gl_limit_aggregate: General liability aggregate limit (e.g., "$2,000,000")
+- workers_comp: boolean - is workers compensation coverage present?
+- auto_liability: boolean - is auto liability coverage present?
+- umbrella_limit: Umbrella/excess liability limit if present (e.g., "$5,000,000")
+- additional_insured_checked: boolean - is the Additional Insured checkbox marked?
+- waiver_of_subrogation_checked: boolean - is the Waiver of Subrogation checkbox marked?
+- primary_noncontributory: boolean - is primary and non-contributory language present?
+- certificate_holder: Name and address of certificate holder
+- description_of_operations: Contents of the Description of Operations field
+- cg_20_10_endorsement: boolean - is CG 20 10 (ongoing operations) endorsement referenced?
+- cg_20_37_endorsement: boolean - is CG 20 37 (completed operations) endorsement referenced?
+
+IMPORTANT: Being listed as "Certificate Holder" does NOT make someone an Additional Insured. These are separate concepts.
+
+If a field isn't clearly present, use null for strings or false for booleans.
+
+COI Document:
+<<DOCUMENT>>
+
+Return ONLY valid JSON, no markdown formatting."""
+
+COI_COMPLIANCE_PROMPT = """You are an expert insurance compliance analyst. Analyze this COI data against the contract requirements and identify all compliance gaps.
+
+CRITICAL DISTINCTION: Being listed as "Certificate Holder" does NOT make someone an Additional Insured. The Additional Insured box must be checked AND proper endorsements (CG 20 10, CG 20 37) should be referenced. This distinction has cost companies millions in lawsuits.
+
+COI Data Extracted:
+<<COI_DATA>>
+
+Contract Requirements:
+<<REQUIREMENTS>>
+
+Project Type: <<PROJECT_TYPE>>
+
+Analyze EACH requirement and return a JSON object with:
+{
+  "overall_status": "compliant" | "non-compliant" | "needs-review",
+  "critical_gaps": [
+    {
+      "name": "Requirement name",
+      "required_value": "What was required",
+      "actual_value": "What the COI shows",
+      "status": "fail",
+      "explanation": "Why this is a critical gap and what the risk is"
+    }
+  ],
+  "warnings": [
+    {
+      "name": "Requirement name",
+      "required_value": "What was required",
+      "actual_value": "What the COI shows",
+      "status": "warning",
+      "explanation": "Why this needs attention"
+    }
+  ],
+  "passed": [
+    {
+      "name": "Requirement name",
+      "required_value": "What was required",
+      "actual_value": "What the COI shows",
+      "status": "pass",
+      "explanation": "Requirement satisfied"
+    }
+  ],
+  "risk_exposure": "Estimated dollar exposure if gaps are not addressed (e.g., '$1M+ potential liability')",
+  "fix_request_letter": "A professional but firm letter to send to the subcontractor requesting corrections. Include specific items that need to be fixed, reference the contract requirements, and set a deadline. The letter should be ready to copy and send."
+}
+
+Check these items (mark as critical gaps if failed):
+1. GL Per Occurrence Limit - meets or exceeds required minimum
+2. GL Aggregate Limit - meets or exceeds required minimum
+3. Additional Insured Status - box is checked AND endorsement is referenced (not just certificate holder!)
+4. Waiver of Subrogation - checked if required
+5. Coverage Dates - effective before project, expiration after project end
+6. Workers Compensation - present if required
+
+Check these items (mark as warnings if issues found):
+7. CG 20 10 Endorsement - ongoing operations coverage
+8. CG 20 37 Endorsement - completed operations coverage
+9. Primary & Non-Contributory language
+10. Umbrella/Excess limits if required
+11. Policy numbers present and formatted correctly
+12. Certificate holder name/address correct
+
+Return ONLY valid JSON, no markdown formatting."""
 
 EXTRACTION_PROMPT = """You are an expert insurance document analyst. Extract structured data from this insurance document.
 
@@ -376,6 +579,368 @@ Format as markdown with clear sections. Keep it concise but comprehensive."""
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+def parse_limit_to_number(limit_str: str) -> int:
+    """Parse a limit string like '$1,000,000' or '$1M' to an integer"""
+    if not limit_str:
+        return 0
+    # Remove $ and commas
+    cleaned = limit_str.replace('$', '').replace(',', '').strip().upper()
+    # Handle M for million, K for thousand
+    if 'M' in cleaned:
+        try:
+            return int(float(cleaned.replace('M', '')) * 1000000)
+        except:
+            return 0
+    if 'K' in cleaned:
+        try:
+            return int(float(cleaned.replace('K', '')) * 1000)
+        except:
+            return 0
+    try:
+        return int(cleaned)
+    except:
+        return 0
+
+def mock_coi_extract(text: str) -> dict:
+    """Generate mock COI extraction for testing"""
+    text_lower = text.lower()
+
+    # Try to extract insured name
+    insured = None
+    for pattern in [r'insured[:\s]+([A-Za-z\s&.,]+?)(?:\n|policy|$)',
+                    r'named insured[:\s]+([A-Za-z\s&.,]+?)(?:\n|dba|$)']:
+        match = re.search(pattern, text, re.IGNORECASE)
+        if match:
+            insured = match.group(1).strip()
+            break
+
+    # Extract GL limits
+    gl_per_occ = None
+    gl_agg = None
+    gl_match = re.search(r'(?:each occurrence|per occurrence)[:\s]*\$?([\d,]+)', text, re.IGNORECASE)
+    if gl_match:
+        gl_per_occ = f"${gl_match.group(1)}"
+    agg_match = re.search(r'(?:general aggregate|aggregate)[:\s]*\$?([\d,]+)', text, re.IGNORECASE)
+    if agg_match:
+        gl_agg = f"${agg_match.group(1)}"
+
+    # Check for additional insured
+    ai_checked = bool(re.search(r'\[x\]\s*additional\s*insured', text, re.IGNORECASE)) or \
+                 bool(re.search(r'additional\s*insured.*checked', text, re.IGNORECASE)) or \
+                 ('additional insured' in text_lower and '[x]' in text_lower)
+
+    # Check for waiver of subrogation
+    wos_checked = bool(re.search(r'\[x\]\s*waiver\s*of\s*subrogation', text, re.IGNORECASE)) or \
+                  bool(re.search(r'waiver\s*of\s*subrogation.*checked', text, re.IGNORECASE))
+
+    # Certificate holder
+    cert_holder = None
+    ch_match = re.search(r'certificate holder[:\s]*\n?([A-Za-z\s&.,\n]+?)(?:\n\n|$)', text, re.IGNORECASE)
+    if ch_match:
+        cert_holder = ch_match.group(1).strip()
+
+    # Umbrella limit
+    umbrella = None
+    umb_match = re.search(r'umbrella[:\s]*\$?([\d,MmKk]+)', text, re.IGNORECASE)
+    if umb_match:
+        umbrella = f"${umb_match.group(1)}"
+
+    return {
+        "insured_name": insured,
+        "policy_number": None,
+        "carrier": None,
+        "effective_date": None,
+        "expiration_date": None,
+        "gl_limit_per_occurrence": gl_per_occ,
+        "gl_limit_aggregate": gl_agg,
+        "workers_comp": 'workers comp' in text_lower or 'work comp' in text_lower,
+        "auto_liability": 'auto' in text_lower or 'automobile' in text_lower,
+        "umbrella_limit": umbrella,
+        "additional_insured_checked": ai_checked,
+        "waiver_of_subrogation_checked": wos_checked,
+        "primary_noncontributory": 'primary' in text_lower and 'non-contributory' in text_lower,
+        "certificate_holder": cert_holder,
+        "description_of_operations": None,
+        "cg_20_10_endorsement": 'cg 20 10' in text_lower or 'cg2010' in text_lower,
+        "cg_20_37_endorsement": 'cg 20 37' in text_lower or 'cg2037' in text_lower,
+    }
+
+def mock_compliance_check(coi_data: dict, requirements: dict) -> dict:
+    """Generate mock compliance check for testing"""
+    critical_gaps = []
+    warnings = []
+    passed = []
+
+    # Check GL per occurrence
+    coi_limit = parse_limit_to_number(coi_data.get('gl_limit_per_occurrence', '') or '')
+    req_limit = requirements.get('gl_per_occurrence', 1000000)
+    if coi_limit >= req_limit:
+        passed.append({
+            "name": "GL Per Occurrence Limit",
+            "required_value": f"${req_limit:,}",
+            "actual_value": coi_data.get('gl_limit_per_occurrence', 'Not specified'),
+            "status": "pass",
+            "explanation": "Limit meets or exceeds requirement"
+        })
+    else:
+        critical_gaps.append({
+            "name": "GL Per Occurrence Limit",
+            "required_value": f"${req_limit:,}",
+            "actual_value": coi_data.get('gl_limit_per_occurrence', 'Not specified'),
+            "status": "fail",
+            "explanation": f"INADEQUATE COVERAGE: Limit is ${coi_limit:,} but contract requires ${req_limit:,}. This leaves a ${req_limit - coi_limit:,} gap in coverage."
+        })
+
+    # Check GL aggregate
+    coi_agg = parse_limit_to_number(coi_data.get('gl_limit_aggregate', '') or '')
+    req_agg = requirements.get('gl_aggregate', 2000000)
+    if coi_agg >= req_agg:
+        passed.append({
+            "name": "GL Aggregate Limit",
+            "required_value": f"${req_agg:,}",
+            "actual_value": coi_data.get('gl_limit_aggregate', 'Not specified'),
+            "status": "pass",
+            "explanation": "Aggregate limit meets or exceeds requirement"
+        })
+    else:
+        critical_gaps.append({
+            "name": "GL Aggregate Limit",
+            "required_value": f"${req_agg:,}",
+            "actual_value": coi_data.get('gl_limit_aggregate', 'Not specified'),
+            "status": "fail",
+            "explanation": f"INADEQUATE COVERAGE: Aggregate is ${coi_agg:,} but contract requires ${req_agg:,}."
+        })
+
+    # Check Additional Insured (CRITICAL)
+    if requirements.get('additional_insured_required', True):
+        if coi_data.get('additional_insured_checked'):
+            if coi_data.get('cg_20_10_endorsement') or coi_data.get('cg_20_37_endorsement'):
+                passed.append({
+                    "name": "Additional Insured Status",
+                    "required_value": "Additional Insured box checked with proper endorsement",
+                    "actual_value": "Box checked with endorsement referenced",
+                    "status": "pass",
+                    "explanation": "Additional insured status properly documented"
+                })
+            else:
+                warnings.append({
+                    "name": "Additional Insured Endorsement",
+                    "required_value": "CG 20 10 / CG 20 37 endorsement referenced",
+                    "actual_value": "Box checked but no endorsement number listed",
+                    "status": "warning",
+                    "explanation": "Additional Insured box is checked but no specific endorsement (CG 20 10, CG 20 37) is referenced. Request confirmation of actual endorsement."
+                })
+        else:
+            critical_gaps.append({
+                "name": "Additional Insured Status",
+                "required_value": "Must be named as Additional Insured",
+                "actual_value": "Additional Insured box NOT checked",
+                "status": "fail",
+                "explanation": "CRITICAL: Being listed as Certificate Holder does NOT make you an Additional Insured. The California scaffolding case (Pardee v. Pacific) resulted in $3.5M+ in damages when this distinction was ignored. Request endorsement CG 20 10 for ongoing operations."
+            })
+
+    # Check Waiver of Subrogation
+    if requirements.get('waiver_of_subrogation_required', True):
+        if coi_data.get('waiver_of_subrogation_checked'):
+            passed.append({
+                "name": "Waiver of Subrogation",
+                "required_value": "Waiver of Subrogation required",
+                "actual_value": "Waiver of Subrogation checked",
+                "status": "pass",
+                "explanation": "Waiver of subrogation is in place"
+            })
+        else:
+            critical_gaps.append({
+                "name": "Waiver of Subrogation",
+                "required_value": "Waiver of Subrogation required",
+                "actual_value": "Waiver of Subrogation NOT checked",
+                "status": "fail",
+                "explanation": "Missing Waiver of Subrogation. This allows the subcontractor's insurer to sue you after paying a claim. Request this endorsement."
+            })
+
+    # Check Workers Comp
+    if requirements.get('workers_comp_required', True):
+        if coi_data.get('workers_comp'):
+            passed.append({
+                "name": "Workers Compensation",
+                "required_value": "Workers Compensation required",
+                "actual_value": "Workers Comp present",
+                "status": "pass",
+                "explanation": "Workers compensation coverage confirmed"
+            })
+        else:
+            critical_gaps.append({
+                "name": "Workers Compensation",
+                "required_value": "Workers Compensation required",
+                "actual_value": "Workers Comp NOT shown",
+                "status": "fail",
+                "explanation": "No workers compensation coverage shown. This is required for all contractors with employees."
+            })
+
+    # Check Umbrella if required
+    if requirements.get('umbrella_required', False):
+        umbrella_limit = parse_limit_to_number(coi_data.get('umbrella_limit', '') or '')
+        req_umbrella = requirements.get('umbrella_minimum', 2000000)
+        if umbrella_limit >= req_umbrella:
+            passed.append({
+                "name": "Umbrella/Excess Liability",
+                "required_value": f"${req_umbrella:,} umbrella required",
+                "actual_value": coi_data.get('umbrella_limit') or 'Not specified',
+                "status": "pass",
+                "explanation": "Umbrella coverage meets requirement"
+            })
+        else:
+            warnings.append({
+                "name": "Umbrella/Excess Liability",
+                "required_value": f"${req_umbrella:,} umbrella required",
+                "actual_value": coi_data.get('umbrella_limit') or 'Not shown',
+                "status": "warning",
+                "explanation": f"Umbrella coverage is insufficient or not shown. Contract requires ${req_umbrella:,}."
+            })
+
+    # Determine overall status
+    if len(critical_gaps) > 0:
+        overall_status = "non-compliant"
+    elif len(warnings) > 0:
+        overall_status = "needs-review"
+    else:
+        overall_status = "compliant"
+
+    # Calculate risk exposure
+    total_gap = 0
+    for gap in critical_gaps:
+        if 'GL' in gap['name']:
+            total_gap += 1000000  # Estimate $1M exposure per GL gap
+        elif 'Additional Insured' in gap['name']:
+            total_gap += 3500000  # Based on real case outcomes
+        elif 'Waiver' in gap['name']:
+            total_gap += 500000
+
+    risk_exposure = f"${total_gap:,}+ potential liability exposure" if total_gap > 0 else "Minimal risk exposure"
+
+    # Generate fix request letter
+    fix_items = []
+    for gap in critical_gaps:
+        fix_items.append(f"- {gap['name']}: {gap['explanation']}")
+    for warn in warnings:
+        fix_items.append(f"- {warn['name']}: {warn['explanation']}")
+
+    fix_letter = f"""RE: Certificate of Insurance Compliance - Immediate Action Required
+
+Dear {coi_data.get('insured_name', '[Subcontractor Name]')},
+
+We have reviewed the Certificate of Insurance submitted for your work on our project and identified the following compliance gaps that must be addressed before work can proceed:
+
+ITEMS REQUIRING CORRECTION:
+{chr(10).join(fix_items)}
+
+Per our contract agreement, the following insurance requirements must be met:
+- General Liability: ${requirements.get('gl_per_occurrence', 1000000):,} per occurrence / ${requirements.get('gl_aggregate', 2000000):,} aggregate
+- Additional Insured endorsement (CG 20 10 for ongoing operations, CG 20 37 for completed operations)
+- Waiver of Subrogation endorsement
+- Workers Compensation at statutory limits
+
+IMPORTANT: Being listed as "Certificate Holder" does NOT satisfy the Additional Insured requirement. We must be named as an Additional Insured on your policy with the proper endorsement.
+
+Please provide an updated Certificate of Insurance with the required coverages and endorsements within 5 business days.
+
+If you have questions, please contact us immediately.
+
+Regards,
+[Your Name]
+[Your Company]
+"""
+
+    return {
+        "overall_status": overall_status,
+        "coi_data": coi_data,
+        "critical_gaps": critical_gaps,
+        "warnings": warnings,
+        "passed": passed,
+        "risk_exposure": risk_exposure,
+        "fix_request_letter": fix_letter
+    }
+
+@app.post("/api/check-coi-compliance", response_model=ComplianceReport)
+async def check_coi_compliance(input: COIComplianceInput):
+    """Check a Certificate of Insurance against contract requirements"""
+    try:
+        # Get requirements from preset or custom
+        if input.project_type and input.project_type in PROJECT_TYPE_REQUIREMENTS:
+            requirements = PROJECT_TYPE_REQUIREMENTS[input.project_type]
+        elif input.custom_requirements:
+            requirements = input.custom_requirements
+        else:
+            # Default to commercial construction requirements
+            requirements = PROJECT_TYPE_REQUIREMENTS["commercial_construction"]
+
+        project_type_name = requirements.get('name', 'Commercial Construction')
+
+        # Use mock mode or real API
+        if MOCK_MODE:
+            coi_data = mock_coi_extract(input.coi_text)
+            result = mock_compliance_check(coi_data, requirements)
+            return ComplianceReport(**result)
+
+        # Step 1: Extract COI data
+        extract_prompt = COI_EXTRACTION_PROMPT.replace("<<DOCUMENT>>", input.coi_text)
+        message = get_client().messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=4096,
+            messages=[{"role": "user", "content": extract_prompt}]
+        )
+
+        response_text = message.content[0].text
+        if response_text.startswith("```"):
+            response_text = response_text.split("```")[1]
+            if response_text.startswith("json"):
+                response_text = response_text[4:]
+        response_text = response_text.strip()
+
+        coi_data = json.loads(response_text)
+
+        # Step 2: Check compliance
+        compliance_prompt = COI_COMPLIANCE_PROMPT.replace("<<COI_DATA>>", json.dumps(coi_data, indent=2))
+        compliance_prompt = compliance_prompt.replace("<<REQUIREMENTS>>", json.dumps(requirements, indent=2))
+        compliance_prompt = compliance_prompt.replace("<<PROJECT_TYPE>>", project_type_name)
+
+        message = get_client().messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=4096,
+            messages=[{"role": "user", "content": compliance_prompt}]
+        )
+
+        response_text = message.content[0].text
+        if response_text.startswith("```"):
+            response_text = response_text.split("```")[1]
+            if response_text.startswith("json"):
+                response_text = response_text[4:]
+        response_text = response_text.strip()
+
+        result = json.loads(response_text)
+        result['coi_data'] = coi_data
+
+        return ComplianceReport(**result)
+
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=500, detail=f"Failed to parse response: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/project-types")
+async def get_project_types():
+    """Get available preset project types and their requirements"""
+    return {
+        key: {
+            "name": val["name"],
+            "gl_per_occurrence": f"${val['gl_per_occurrence']:,}",
+            "gl_aggregate": f"${val['gl_aggregate']:,}",
+            "umbrella_required": val.get("umbrella_required", False),
+            "umbrella_minimum": f"${val.get('umbrella_minimum', 0):,}" if val.get('umbrella_minimum', 0) > 0 else None,
+        }
+        for key, val in PROJECT_TYPE_REQUIREMENTS.items()
+    }
 
 if __name__ == "__main__":
     import uvicorn
