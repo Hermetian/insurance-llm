@@ -41,7 +41,7 @@ export ANTHROPIC_API_KEY=your_key_here
 python main.py
 ```
 
-Backend runs at `http://localhost:8080`
+Backend runs at `http://localhost:8081`
 
 ### Frontend
 
@@ -68,6 +68,39 @@ The app includes three sample documents to demo:
 1. **Messy COI Email** - Forwarded certificate with casual notes
 2. **Scanned Quote PDF (OCR)** - Commercial property quote with formatting artifacts
 3. **Policy Renewal Notice** - Coverage changes and exclusions
+
+## Testing
+
+### Run the Test Suite
+
+```bash
+cd backend
+source venv/bin/activate
+
+# Run with mock mode (no API key required)
+MOCK_MODE=true python main.py &
+python test_api.py
+
+# Run with real API
+export ANTHROPIC_API_KEY=your_key_here
+python main.py &
+python test_api.py
+```
+
+### Test Coverage
+
+| Test | Description |
+|------|-------------|
+| Health Check | API connectivity |
+| Extract Messy COI | Forwarded email with informal formatting |
+| Extract Property Quote | Commercial property with coverage table |
+| Extract Renewal Notice | Policy changes and new exclusions |
+| Extract Minimal Doc | Sparse document handling |
+| Extract Empty Doc | Empty input validation |
+| Extract Gibberish | Non-insurance content handling |
+| Generate Proposal | Client proposal from extracted data |
+| Invalid JSON Payload | Error handling for malformed requests |
+| Missing Text Field | Required field validation |
 
 ## Why This Exists
 
