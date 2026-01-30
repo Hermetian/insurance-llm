@@ -52,6 +52,39 @@ interface ComplianceReport {
   fix_request_letter: string
 }
 
+// Lease Analysis Types
+interface LeaseInsuranceClause {
+  clause_type: string
+  original_text: string
+  summary: string
+  risk_level: 'high' | 'medium' | 'low'
+  explanation: string
+  recommendation: string
+}
+
+interface LeaseRedFlag {
+  name: string
+  severity: 'critical' | 'warning' | 'info'
+  clause_text?: string
+  explanation: string
+  protection: string
+}
+
+interface LeaseAnalysisReport {
+  overall_risk: 'high' | 'medium' | 'low'
+  risk_score: number
+  lease_type: string
+  landlord_name?: string
+  tenant_name?: string
+  property_address?: string
+  lease_term?: string
+  insurance_requirements: LeaseInsuranceClause[]
+  red_flags: LeaseRedFlag[]
+  missing_protections: string[]
+  summary: string
+  negotiation_letter: string
+}
+
 // US States for compliance checking
 const US_STATES = [
   { code: '', name: 'Select State (optional)' },
@@ -142,6 +175,8 @@ function App() {
   // Results
   const [complianceReport, setComplianceReport] = useState<ComplianceReport | null>(null)
   const [complianceTab, setComplianceTab] = useState<'report' | 'letter'>('report')
+  const [leaseReport, setLeaseReport] = useState<LeaseAnalysisReport | null>(null)
+  const [leaseTab, setLeaseTab] = useState<'report' | 'letter'>('report')
 
   // Unsupported document modal
   const [showUnsupportedModal, setShowUnsupportedModal] = useState(false)
@@ -173,6 +208,7 @@ function App() {
 
     setUploadedFileName(file.name)
     setComplianceReport(null)
+    setLeaseReport(null)
     setDocType(null)
 
     let text = ''
@@ -307,13 +343,30 @@ function App() {
   }
 
   const analyzeLease = async () => {
-    // TODO: Implement lease analysis
-    // For now, show a placeholder
     setLoading(true)
-    setTimeout(() => {
+    setLeaseReport(null)
+
+    try {
+      const res = await fetch(`${API_BASE}/api/analyze-lease`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          lease_text: docText,
+          state: selectedState || null,
+          lease_type: 'commercial'
+        })
+      })
+
+      if (!res.ok) throw new Error('Lease analysis failed')
+      const data = await res.json()
+      setLeaseReport(data)
+      setLeaseTab('report')
+    } catch (err) {
+      console.error(err)
+      alert('Failed to analyze lease. Make sure the backend is running!')
+    } finally {
       setLoading(false)
-      alert('Lease analysis coming soon! The backend endpoint is being built.')
-    }, 500)
+    }
   }
 
   const handleWaitlistSubmit = () => {
@@ -327,6 +380,7 @@ function App() {
     setDocText('')
     setDocType(null)
     setComplianceReport(null)
+    setLeaseReport(null)
     setShowUnsupportedModal(false)
     setWaitlistEmail('')
     setEmailSubmitted(false)
@@ -366,6 +420,35 @@ function App() {
     if (classifying) return '[ READING... ]'
     if (ocrLoading) return '[ EXTRACTING... ]'
     return '> CAN THEY FUCK ME?'
+  }
+
+  const getRiskColor = (risk: string) => {
+    switch (risk) {
+      case 'high':
+      case 'critical':
+        return 'var(--pixel-red)'
+      case 'medium':
+      case 'warning':
+        return 'var(--pixel-yellow)'
+      case 'low':
+      case 'info':
+        return 'var(--pixel-green)'
+      default:
+        return 'var(--pixel-gray)'
+    }
+  }
+
+  const getRiskLabel = (risk: string) => {
+    switch (risk) {
+      case 'high':
+        return 'HIGH RISK'
+      case 'medium':
+        return 'MEDIUM RISK'
+      case 'low':
+        return 'LOW RISK'
+      default:
+        return risk.toUpperCase()
+    }
   }
 
   return (
@@ -431,21 +514,23 @@ function App() {
             rows={8}
           />
 
-          {docType?.document_type === 'coi' && (
+          {(docType?.document_type === 'coi' || docType?.document_type === 'lease') && (
             <div className="options-row">
-              <div className="option-group">
-                <span className="label">TYPE:</span>
-                <select
-                  className="pixel-select"
-                  value={projectType}
-                  onChange={(e) => setProjectType(e.target.value)}
-                >
-                  <option value="commercial_construction">Commercial ($1M/$2M)</option>
-                  <option value="residential_construction">Residential ($500K/$1M)</option>
-                  <option value="government_municipal">Government ($2M/$4M)</option>
-                  <option value="industrial_manufacturing">Industrial ($2M/$4M)</option>
-                </select>
-              </div>
+              {docType?.document_type === 'coi' && (
+                <div className="option-group">
+                  <span className="label">TYPE:</span>
+                  <select
+                    className="pixel-select"
+                    value={projectType}
+                    onChange={(e) => setProjectType(e.target.value)}
+                  >
+                    <option value="commercial_construction">Commercial ($1M/$2M)</option>
+                    <option value="residential_construction">Residential ($500K/$1M)</option>
+                    <option value="government_municipal">Government ($2M/$4M)</option>
+                    <option value="industrial_manufacturing">Industrial ($2M/$4M)</option>
+                  </select>
+                </div>
+              )}
 
               <div className="option-group">
                 <span className="label">STATE:</span>
@@ -638,6 +723,179 @@ function App() {
                 <button
                   className="pixel-btn secondary"
                   onClick={() => navigator.clipboard.writeText(complianceReport.fix_request_letter)}
+                >
+                  [COPY] COPY LETTER
+                </button>
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* Lease Analysis Results */}
+        {leaseReport && (
+          <section className="output-section lease-output">
+            <div className="compliance-header">
+              <div
+                className="compliance-status-badge"
+                style={{ backgroundColor: getRiskColor(leaseReport.overall_risk) }}
+              >
+                {getRiskLabel(leaseReport.overall_risk)}
+              </div>
+              <div className="risk-exposure">
+                <span className="label">RISK SCORE:</span>
+                <span className="value">{leaseReport.risk_score}/100</span>
+              </div>
+            </div>
+
+            <p className="summary-text">{leaseReport.summary}</p>
+
+            <div className="tabs">
+              <button
+                className={`tab ${leaseTab === 'report' ? 'active' : ''}`}
+                onClick={() => setLeaseTab('report')}
+              >
+                * ANALYSIS
+              </button>
+              <button
+                className={`tab ${leaseTab === 'letter' ? 'active' : ''}`}
+                onClick={() => setLeaseTab('letter')}
+              >
+                * NEGOTIATION LETTER
+              </button>
+            </div>
+
+            {leaseTab === 'report' && (
+              <div className="compliance-report">
+                {/* Red Flags */}
+                {leaseReport.red_flags.filter(rf => rf.severity === 'critical').length > 0 && (
+                  <div className="data-card danger full-width">
+                    <h3>XX CRITICAL RED FLAGS</h3>
+                    <div className="compliance-items">
+                      {leaseReport.red_flags.filter(rf => rf.severity === 'critical').map((flag, i) => (
+                        <div key={i} className="compliance-item fail">
+                          <div className="item-header">
+                            <span className="status-icon">✗</span>
+                            <span className="item-name">{flag.name}</span>
+                          </div>
+                          {flag.clause_text && (
+                            <div className="clause-text">
+                              <span className="label">CLAUSE:</span>
+                              <span className="value">"{flag.clause_text}"</span>
+                            </div>
+                          )}
+                          <p className="item-explanation">{flag.explanation}</p>
+                          <div className="protection-box">
+                            <span className="label">PROTECTION:</span>
+                            <span className="value">{flag.protection}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Warnings */}
+                {leaseReport.red_flags.filter(rf => rf.severity === 'warning').length > 0 && (
+                  <div className="data-card warning full-width">
+                    <h3>!! WATCH OUT FOR</h3>
+                    <div className="compliance-items">
+                      {leaseReport.red_flags.filter(rf => rf.severity === 'warning').map((flag, i) => (
+                        <div key={i} className="compliance-item warning">
+                          <div className="item-header">
+                            <span className="status-icon">!</span>
+                            <span className="item-name">{flag.name}</span>
+                          </div>
+                          {flag.clause_text && (
+                            <div className="clause-text">
+                              <span className="label">CLAUSE:</span>
+                              <span className="value">"{flag.clause_text}"</span>
+                            </div>
+                          )}
+                          <p className="item-explanation">{flag.explanation}</p>
+                          <div className="protection-box">
+                            <span className="label">PROTECTION:</span>
+                            <span className="value">{flag.protection}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Missing Protections */}
+                {leaseReport.missing_protections.length > 0 && (
+                  <div className="data-card info full-width">
+                    <h3>?? MISSING PROTECTIONS</h3>
+                    <div className="missing-list">
+                      {leaseReport.missing_protections.map((item, i) => (
+                        <div key={i} className="missing-item">
+                          <span className="status-icon">-</span>
+                          <span>{item}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Insurance Requirements Found */}
+                {leaseReport.insurance_requirements.length > 0 && (
+                  <div className="data-card full-width">
+                    <h3>* INSURANCE REQUIREMENTS</h3>
+                    <div className="compliance-items">
+                      {leaseReport.insurance_requirements.map((req, i) => (
+                        <div key={i} className={`compliance-item ${req.risk_level === 'high' ? 'fail' : req.risk_level === 'medium' ? 'warning' : 'pass'}`}>
+                          <div className="item-header">
+                            <span className="status-icon">{req.risk_level === 'high' ? '!' : req.risk_level === 'medium' ? '~' : '✓'}</span>
+                            <span className="item-name">{req.summary}</span>
+                          </div>
+                          <p className="item-explanation">{req.explanation}</p>
+                          <div className="protection-box">
+                            <span className="label">DO:</span>
+                            <span className="value">{req.recommendation}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Lease Info */}
+                <div className="data-card full-width">
+                  <h3>* LEASE INFO</h3>
+                  <div className="coi-data-grid">
+                    <div className="data-row">
+                      <span className="label">TYPE:</span>
+                      <span className="value">{leaseReport.lease_type?.toUpperCase() || '---'}</span>
+                    </div>
+                    <div className="data-row">
+                      <span className="label">LANDLORD:</span>
+                      <span className="value">{leaseReport.landlord_name || '---'}</span>
+                    </div>
+                    <div className="data-row">
+                      <span className="label">TENANT:</span>
+                      <span className="value">{leaseReport.tenant_name || '---'}</span>
+                    </div>
+                    <div className="data-row">
+                      <span className="label">PROPERTY:</span>
+                      <span className="value">{leaseReport.property_address || '---'}</span>
+                    </div>
+                    <div className="data-row">
+                      <span className="label">TERM:</span>
+                      <span className="value">{leaseReport.lease_term || '---'}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {leaseTab === 'letter' && (
+              <div className="letter-view">
+                <div className="letter-content">
+                  <pre>{leaseReport.negotiation_letter}</pre>
+                </div>
+                <button
+                  className="pixel-btn secondary"
+                  onClick={() => navigator.clipboard.writeText(leaseReport.negotiation_letter)}
                 >
                   [COPY] COPY LETTER
                 </button>

@@ -1042,3 +1042,78 @@ body {
   color: var(--pixel-text);
   margin-left: 10px;
 }
+
+/* LEASE ANALYSIS STYLES */
+.summary-text {
+  font-size: 20px;
+  line-height: 1.5;
+  margin: 15px 0;
+  padding: 15px;
+  background: var(--pixel-bg-dark);
+  border-left: 4px solid var(--pixel-accent);
+}
+
+.clause-text {
+  background: rgba(0, 0, 0, 0.05);
+  padding: 10px;
+  margin: 10px 0;
+  font-style: italic;
+  border-left: 3px solid var(--pixel-gray);
+}
+
+.clause-text .label {
+  display: block;
+  font-size: 12px;
+  font-style: normal;
+  margin-bottom: 5px;
+  color: var(--pixel-gray);
+}
+
+.clause-text .value {
+  font-size: 16px;
+}
+
+.protection-box {
+  background: rgba(123, 201, 111, 0.15);
+  padding: 10px;
+  margin-top: 10px;
+  border-left: 3px solid var(--pixel-green);
+}
+
+.protection-box .label {
+  font-family: 'Press Start 2P', cursive;
+  font-size: 10px;
+  color: var(--pixel-green);
+  margin-right: 10px;
+}
+
+.protection-box .value {
+  font-size: 16px;
+}
+
+.missing-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.missing-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px;
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.missing-item .status-icon {
+  color: var(--pixel-gray);
+  font-weight: bold;
+}
+
+.data-card.info {
+  border-left: 4px solid var(--pixel-accent-2);
+}
+
+.data-card.info h3 {
+  color: var(--pixel-accent-2);
+}

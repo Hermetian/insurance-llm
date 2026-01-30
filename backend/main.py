@@ -285,6 +285,167 @@ SUPPORTED_DOC_TYPES = {
     }
 }
 
+
+# ============== LEASE ANALYSIS MODELS ==============
+
+class LeaseInsuranceClause(BaseModel):
+    clause_type: str  # e.g., "liability_requirement", "additional_insured", "waiver_of_subrogation"
+    original_text: str  # The actual clause text from the lease
+    summary: str  # Plain English summary
+    risk_level: str  # "high", "medium", "low"
+    explanation: str  # Why this matters
+    recommendation: str  # What to do about it
+
+
+class LeaseRedFlag(BaseModel):
+    name: str
+    severity: str  # "critical", "warning", "info"
+    clause_text: Optional[str]  # The problematic clause if found
+    explanation: str
+    protection: str  # How to protect yourself
+
+
+class LeaseAnalysisInput(BaseModel):
+    lease_text: str
+    state: Optional[str] = None
+    lease_type: Optional[str] = "commercial"  # "commercial" or "residential"
+
+
+class LeaseAnalysisReport(BaseModel):
+    overall_risk: str  # "high", "medium", "low"
+    risk_score: int  # 0-100 (100 = very risky for tenant)
+    lease_type: str
+    landlord_name: Optional[str]
+    tenant_name: Optional[str]
+    property_address: Optional[str]
+    lease_term: Optional[str]
+
+    # Insurance requirements found
+    insurance_requirements: list[LeaseInsuranceClause]
+
+    # Red flags found
+    red_flags: list[LeaseRedFlag]
+
+    # What's missing that should be there
+    missing_protections: list[str]
+
+    # Summary
+    summary: str
+
+    # Negotiation letter
+    negotiation_letter: str
+
+
+# Lease insurance red flags to check
+LEASE_RED_FLAGS = {
+    "blanket_indemnification": {
+        "name": "Blanket Indemnification",
+        "keywords": ["indemnify", "hold harmless", "defend"],
+        "bad_pattern": "all claims",  # Without negligence carve-out
+        "severity": "critical",
+        "explanation": "You may be agreeing to pay for the landlord's mistakes, not just your own.",
+        "protection": "Add 'except to the extent caused by landlord's negligence or willful misconduct'"
+    },
+    "landlord_not_liable": {
+        "name": "Landlord Not Liable Clause",
+        "keywords": ["landlord shall not be liable", "not responsible for", "waives all claims"],
+        "severity": "critical",
+        "explanation": "Landlord is trying to eliminate liability even for their own negligence.",
+        "protection": "Add 'except for landlord's negligence or willful misconduct'"
+    },
+    "insurance_proceeds_to_landlord": {
+        "name": "Insurance Proceeds to Landlord",
+        "keywords": ["insurance proceeds", "paid to landlord", "payable to lessor"],
+        "severity": "critical",
+        "explanation": "Your insurance payout for your improvements could go to the landlord instead of you.",
+        "protection": "Ensure your improvements coverage pays you directly"
+    },
+    "no_tenant_termination": {
+        "name": "No Tenant Termination Right",
+        "keywords": ["landlord may terminate", "tenant shall have no right"],
+        "severity": "critical",
+        "explanation": "If there's major damage, landlord can walk away but you're stuck waiting or paying rent.",
+        "protection": "Negotiate mutual termination rights or tenant termination if repairs exceed 90-180 days"
+    },
+    "additional_insured_requirement": {
+        "name": "Additional Insured Requirement",
+        "keywords": ["additional insured", "named insured"],
+        "severity": "warning",
+        "explanation": "Landlord will share YOUR policy limits. If they use $500K defending themselves, you only have $500K left.",
+        "protection": "Increase liability limits to account for sharing. Negotiate to exclude landlord's sole negligence."
+    },
+    "primary_noncontributory": {
+        "name": "Primary and Non-Contributory",
+        "keywords": ["primary and non-contributory", "primary basis", "non-contributory"],
+        "severity": "warning",
+        "explanation": "Your policy pays first even if the landlord was at fault. Very landlord-favorable.",
+        "protection": "Resist this language or significantly increase your limits"
+    },
+    "waiver_of_subrogation": {
+        "name": "Waiver of Subrogation",
+        "keywords": ["waiver of subrogation", "waive subrogation", "waiver of recovery"],
+        "severity": "warning",
+        "explanation": "If landlord's negligence damages your property, your insurer can't sue them to recover. You eat the deductibles and gaps.",
+        "protection": "Ensure it's mutual. Get the endorsement on your policy. Negotiate carve-outs for gross negligence."
+    },
+    "self_insurance_requirement": {
+        "name": "Self-Insurance/High Deductible",
+        "keywords": ["self-insure", "first $", "deductible of"],
+        "severity": "warning",
+        "explanation": "This is a hidden cost - every claim will cost you this amount out of pocket.",
+        "protection": "Negotiate down or eliminate. Budget for it if unavoidable."
+    },
+    "coverage_lapse_default": {
+        "name": "Coverage Lapse = Default",
+        "keywords": ["lapse in coverage", "failure to maintain", "immediate default"],
+        "severity": "warning",
+        "explanation": "A paperwork error by your insurer could get you evicted.",
+        "protection": "Negotiate a 30-day cure period. Set up automatic payments."
+    },
+    "landlord_can_purchase_insurance": {
+        "name": "Landlord Can Buy and Charge Back",
+        "keywords": ["landlord may purchase", "charge to tenant", "additional rent"],
+        "severity": "warning",
+        "explanation": "Landlord buys overpriced coverage and bills you at a markup as 'rent'.",
+        "protection": "Negotiate right to cure before landlord can purchase. Cap chargebacks at market rates."
+    },
+    "care_custody_control_gap": {
+        "name": "Care, Custody & Control Gap",
+        "keywords": ["damage to premises", "damage to building", "tenant responsible for"],
+        "severity": "warning",
+        "explanation": "Your GL policy excludes damage to property you rent. You could be personally liable for building damage.",
+        "protection": "Add 'Damage to Premises Rented to You' coverage (Fire Legal Liability) with adequate limits."
+    },
+    "betterments_ownership": {
+        "name": "Improvements Become Landlord's Property",
+        "keywords": ["improvements shall become", "property of landlord", "tenant improvements"],
+        "severity": "warning",
+        "explanation": "Your $300K build-out becomes theirs - and they may not insure it.",
+        "protection": "Get Betterments & Improvements coverage at replacement cost. Clarify who insures what in writing."
+    },
+    "unlimited_repair_timeline": {
+        "name": "No Repair Deadline",
+        "keywords": ["reasonable time", "diligent efforts", "as soon as practicable"],
+        "severity": "warning",
+        "explanation": "Landlord has no urgency to repair - especially if they're collecting loss-of-rents insurance.",
+        "protection": "Negotiate hard deadlines (90-180 days max) with termination rights if not met."
+    },
+    "no_rent_abatement": {
+        "name": "No Rent Abatement",
+        "keywords": ["rent shall continue", "no abatement", "rent not reduced"],
+        "severity": "critical",
+        "explanation": "You keep paying rent even when you can't use the space due to damage.",
+        "protection": "Negotiate rent abatement during any period the premises are unusable."
+    },
+    "extraordinary_coverage": {
+        "name": "Unusual Coverage Requirements",
+        "keywords": ["terrorism", "pollution", "cyber", "earthquake", "flood"],
+        "severity": "info",
+        "explanation": "Some of these coverages may be expensive, unavailable, or inapplicable to your business.",
+        "protection": "Only agree to coverage that's available, affordable, and applicable. Add 'if commercially available at reasonable cost'."
+    }
+}
+
 # State-specific insurance requirements data
 # Based on comprehensive research as of January 2026
 
@@ -1550,6 +1711,341 @@ async def classify_document(input: ClassifyInput):
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Classification failed: {str(e)}")
+
+
+# ============== LEASE ANALYSIS ==============
+
+LEASE_EXTRACTION_PROMPT = """You are an expert lease analyst specializing in insurance and liability provisions.
+
+Extract the following from this lease document:
+
+1. BASIC INFO:
+- landlord_name: Name of landlord/lessor
+- tenant_name: Name of tenant/lessee
+- property_address: Property address
+- lease_term: Lease duration (e.g., "3 years", "Month-to-month")
+- lease_type: "commercial" or "residential"
+
+2. INSURANCE CLAUSES: Find ALL clauses related to:
+- Required insurance types and limits (GL, property, umbrella, etc.)
+- Additional insured requirements
+- Waiver of subrogation
+- Indemnification/hold harmless provisions
+- Who insures what (building vs contents vs improvements)
+- Insurance proceeds allocation
+- Liability waivers or limitations
+- Casualty/damage provisions
+- Rent abatement provisions
+- Repair/restoration obligations
+
+For each insurance clause found, extract:
+- clause_type: Category (e.g., "gl_requirement", "additional_insured", "waiver_of_subrogation", "indemnification", "casualty", "rent_abatement")
+- original_text: The exact text from the lease (keep it reasonably short, just the key language)
+- summary: Plain English explanation
+
+Return JSON:
+{
+  "landlord_name": "...",
+  "tenant_name": "...",
+  "property_address": "...",
+  "lease_term": "...",
+  "lease_type": "commercial" or "residential",
+  "insurance_clauses": [
+    {
+      "clause_type": "...",
+      "original_text": "...",
+      "summary": "..."
+    }
+  ]
+}
+
+LEASE DOCUMENT:
+<<DOCUMENT>>
+
+Return ONLY valid JSON, no markdown."""
+
+LEASE_ANALYSIS_PROMPT = """You are an expert insurance and real estate attorney helping a TENANT understand the risks in their lease.
+
+Your job is to identify provisions that could "fuck" the tenant - clauses that expose them to unexpected liability, costs, or coverage gaps.
+
+EXTRACTED LEASE DATA:
+<<LEASE_DATA>>
+
+RED FLAG DEFINITIONS:
+<<RED_FLAGS>>
+
+STATE: <<STATE>>
+
+Analyze each insurance clause and the lease overall. Return JSON:
+
+{
+  "overall_risk": "high" | "medium" | "low",
+  "risk_score": 0-100 (100 = extremely risky for tenant),
+  "red_flags": [
+    {
+      "name": "Name of the issue",
+      "severity": "critical" | "warning" | "info",
+      "clause_text": "The problematic text if found",
+      "explanation": "Why this fucks the tenant (be direct, use plain language)",
+      "protection": "What to negotiate or do about it"
+    }
+  ],
+  "insurance_requirements": [
+    {
+      "clause_type": "Type of requirement",
+      "original_text": "The clause text",
+      "summary": "Plain English summary",
+      "risk_level": "high" | "medium" | "low",
+      "explanation": "Why this matters to the tenant",
+      "recommendation": "What to do"
+    }
+  ],
+  "missing_protections": [
+    "Things that SHOULD be in the lease but aren't (like rent abatement, repair deadlines, termination rights)"
+  ],
+  "summary": "2-3 sentence summary of the biggest risks in this lease",
+  "negotiation_letter": "A professional but firm letter the tenant can send to the landlord requesting changes. Be specific about which clauses need modification and what the changes should be. Include the most critical items first."
+}
+
+Be direct and practical. Use phrases like "This could cost you..." and "You're agreeing to...".
+The tenant needs to understand the REAL risks, not legal jargon.
+
+Return ONLY valid JSON, no markdown."""
+
+
+def mock_lease_analysis(lease_text: str, state: str = None) -> dict:
+    """Generate mock lease analysis for testing"""
+    text_lower = lease_text.lower()
+
+    red_flags = []
+    insurance_requirements = []
+    risk_score = 50
+
+    # Check for common red flags
+    if 'indemnify' in text_lower and 'hold harmless' in text_lower:
+        if 'negligence' not in text_lower or 'except' not in text_lower:
+            red_flags.append({
+                "name": "Blanket Indemnification",
+                "severity": "critical",
+                "clause_text": "Tenant shall indemnify and hold harmless Landlord from any and all claims...",
+                "explanation": "You're agreeing to pay for the landlord's mistakes, not just your own. If someone slips on ice the landlord should have salted, you could be on the hook.",
+                "protection": "Add: 'except to the extent caused by Landlord's negligence or willful misconduct'"
+            })
+            risk_score += 20
+
+    if 'additional insured' in text_lower:
+        red_flags.append({
+            "name": "Additional Insured Requirement",
+            "severity": "warning",
+            "clause_text": "Tenant shall name Landlord as Additional Insured on all liability policies...",
+            "explanation": "The landlord gets to use YOUR insurance policy limits. If they use $500K defending a lawsuit, you only have $500K left for your own claims.",
+            "protection": "Increase your liability limits. Negotiate to exclude coverage for landlord's sole negligence."
+        })
+        insurance_requirements.append({
+            "clause_type": "additional_insured",
+            "original_text": "Landlord shall be named as Additional Insured",
+            "summary": "You must add the landlord to your insurance policy",
+            "risk_level": "medium",
+            "explanation": "Landlord shares your policy limits",
+            "recommendation": "Increase liability limits to $2M+ to account for sharing"
+        })
+        risk_score += 10
+
+    if 'waiver of subrogation' in text_lower or 'waive subrogation' in text_lower:
+        red_flags.append({
+            "name": "Waiver of Subrogation",
+            "severity": "warning",
+            "clause_text": "Tenant waives all rights of subrogation against Landlord...",
+            "explanation": "If the landlord's negligence causes a fire that destroys your business, your insurance pays you but CAN'T sue the landlord to recover. You eat the deductibles and coverage gaps.",
+            "protection": "Make sure it's mutual. Get the endorsement on your policy. Negotiate carve-outs for gross negligence."
+        })
+        risk_score += 10
+
+    if 'primary and non-contributory' in text_lower:
+        red_flags.append({
+            "name": "Primary and Non-Contributory",
+            "severity": "warning",
+            "clause_text": "Tenant's insurance shall be primary and non-contributory...",
+            "explanation": "Your insurance pays FIRST, even if it's the landlord's fault. Their insurance sits back and watches yours get depleted.",
+            "protection": "Resist this language if possible. If required, significantly increase your limits."
+        })
+        risk_score += 15
+
+    if 'not be liable' in text_lower or 'not responsible' in text_lower:
+        red_flags.append({
+            "name": "Landlord Not Liable",
+            "severity": "critical",
+            "clause_text": "Landlord shall not be liable for any damage to Tenant's property...",
+            "explanation": "The landlord is trying to avoid ALL liability, even for their own negligence. This may not be enforceable, but you'll have to fight it in court.",
+            "protection": "Add: 'except for damage caused by Landlord's negligence or willful misconduct'"
+        })
+        risk_score += 15
+
+    # Check for missing protections
+    missing = []
+    if 'abatement' not in text_lower and 'abate' not in text_lower:
+        missing.append("Rent abatement during periods when premises are unusable")
+        risk_score += 10
+
+    if 'terminate' not in text_lower or ('landlord may terminate' in text_lower and 'tenant may terminate' not in text_lower):
+        missing.append("Tenant termination right if repairs take too long")
+        risk_score += 10
+
+    # Add some basic insurance requirements if found
+    if '$1,000,000' in lease_text or '$1M' in text_lower:
+        insurance_requirements.append({
+            "clause_type": "gl_requirement",
+            "original_text": "Commercial General Liability: $1,000,000 per occurrence",
+            "summary": "You need at least $1M in general liability coverage",
+            "risk_level": "low",
+            "explanation": "This is a standard commercial requirement",
+            "recommendation": "Make sure your policy meets or exceeds this limit"
+        })
+
+    if '$2,000,000' in lease_text or '$2M' in text_lower:
+        insurance_requirements.append({
+            "clause_type": "gl_aggregate",
+            "original_text": "General Aggregate: $2,000,000",
+            "summary": "Your policy needs $2M aggregate limit",
+            "risk_level": "low",
+            "explanation": "Standard aggregate for commercial leases",
+            "recommendation": "Verify your policy's aggregate limit"
+        })
+
+    # Cap risk score
+    risk_score = min(100, risk_score)
+
+    # Determine overall risk
+    if risk_score >= 70:
+        overall_risk = "high"
+    elif risk_score >= 40:
+        overall_risk = "medium"
+    else:
+        overall_risk = "low"
+
+    # Generate summary
+    critical_count = len([r for r in red_flags if r['severity'] == 'critical'])
+    warning_count = len([r for r in red_flags if r['severity'] == 'warning'])
+
+    if critical_count > 0:
+        summary = f"This lease has {critical_count} critical issues that could expose you to significant liability. "
+    else:
+        summary = "This lease has some concerning provisions but no critical red flags. "
+
+    if missing:
+        summary += f"It's also missing {len(missing)} standard tenant protections."
+
+    # Generate negotiation letter
+    letter_items = []
+    for rf in red_flags:
+        if rf['severity'] == 'critical':
+            letter_items.append(f"- {rf['name']}: {rf['protection']}")
+
+    for missing_item in missing[:3]:
+        letter_items.append(f"- Add: {missing_item}")
+
+    letter = f"""RE: Lease Insurance and Liability Terms - Requested Modifications
+
+Dear Landlord,
+
+We have reviewed the proposed lease agreement and identified several provisions that require modification before we can proceed:
+
+REQUESTED CHANGES:
+{chr(10).join(letter_items) if letter_items else '- No critical changes required'}
+
+These modifications reflect standard commercial practice and appropriate risk allocation between landlord and tenant. We believe these changes are reasonable and look forward to discussing them.
+
+Please provide a revised lease addressing these items within 10 business days.
+
+Best regards,
+[Tenant Name]
+"""
+
+    return {
+        "overall_risk": overall_risk,
+        "risk_score": risk_score,
+        "lease_type": "commercial" if 'commercial' in text_lower else "residential",
+        "landlord_name": None,
+        "tenant_name": None,
+        "property_address": None,
+        "lease_term": None,
+        "insurance_requirements": insurance_requirements,
+        "red_flags": red_flags,
+        "missing_protections": missing,
+        "summary": summary,
+        "negotiation_letter": letter
+    }
+
+
+@app.post("/api/analyze-lease", response_model=LeaseAnalysisReport)
+async def analyze_lease(input: LeaseAnalysisInput):
+    """Analyze a lease for insurance-related red flags and risks"""
+    try:
+        # Mock mode
+        if MOCK_MODE:
+            result = mock_lease_analysis(input.lease_text, input.state)
+            return LeaseAnalysisReport(**result)
+
+        client = get_client()
+
+        # Step 1: Extract lease data
+        extract_prompt = LEASE_EXTRACTION_PROMPT.replace("<<DOCUMENT>>", input.lease_text[:15000])  # Limit length
+
+        response = client.chat.completions.create(
+            model=OPENAI_MODEL,
+            max_tokens=4096,
+            messages=[{"role": "user", "content": extract_prompt}]
+        )
+
+        response_text = response.choices[0].message.content
+        if response_text.startswith("```"):
+            response_text = response_text.split("```")[1]
+            if response_text.startswith("json"):
+                response_text = response_text[4:]
+        response_text = response_text.strip()
+
+        lease_data = json.loads(response_text)
+
+        # Step 2: Analyze for red flags
+        analysis_prompt = LEASE_ANALYSIS_PROMPT.replace("<<LEASE_DATA>>", json.dumps(lease_data, indent=2))
+        analysis_prompt = analysis_prompt.replace("<<RED_FLAGS>>", json.dumps(LEASE_RED_FLAGS, indent=2))
+        analysis_prompt = analysis_prompt.replace("<<STATE>>", input.state or "Not specified")
+
+        response = client.chat.completions.create(
+            model=OPENAI_MODEL,
+            max_tokens=4096,
+            messages=[{"role": "user", "content": analysis_prompt}]
+        )
+
+        response_text = response.choices[0].message.content
+        if response_text.startswith("```"):
+            response_text = response_text.split("```")[1]
+            if response_text.startswith("json"):
+                response_text = response_text[4:]
+        response_text = response_text.strip()
+
+        analysis = json.loads(response_text)
+
+        # Merge extraction and analysis
+        return LeaseAnalysisReport(
+            overall_risk=analysis.get("overall_risk", "medium"),
+            risk_score=analysis.get("risk_score", 50),
+            lease_type=lease_data.get("lease_type", input.lease_type),
+            landlord_name=lease_data.get("landlord_name"),
+            tenant_name=lease_data.get("tenant_name"),
+            property_address=lease_data.get("property_address"),
+            lease_term=lease_data.get("lease_term"),
+            insurance_requirements=[LeaseInsuranceClause(**r) for r in analysis.get("insurance_requirements", [])],
+            red_flags=[LeaseRedFlag(**r) for r in analysis.get("red_flags", [])],
+            missing_protections=analysis.get("missing_protections", []),
+            summary=analysis.get("summary", "Analysis complete."),
+            negotiation_letter=analysis.get("negotiation_letter", "")
+        )
+
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=500, detail=f"Failed to parse response: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Lease analysis failed: {str(e)}")
 
 
 if __name__ == "__main__":
