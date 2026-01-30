@@ -195,6 +195,7 @@ body {
   padding: 20px;
   border: 4px solid var(--pixel-border);
   background: #fff;
+  color: var(--pixel-text);
   resize: vertical;
   box-shadow: 4px 4px 0 var(--pixel-shadow);
 }
