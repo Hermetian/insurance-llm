@@ -32,3 +32,7 @@ npm-debug.log*
 coverage/
 .pytest_cache/
 .vercel
+
+# Session memory
+claudepad.md
+oldpad.md
