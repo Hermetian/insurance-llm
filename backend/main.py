@@ -50,6 +50,7 @@ class Upload(Base):
     # Metadata
     source = Column(String(50), default="web")  # web, api, etc.
     user_agent = Column(String(500), nullable=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)  # Link to user for history
 
 class Waitlist(Base):
     __tablename__ = "waitlist"
@@ -131,7 +132,7 @@ def get_db():
         db.close()
         raise
 
-def save_upload(doc_type: str, text: str, state: str = None, analysis: dict = None, user_agent: str = None):
+def save_upload(doc_type: str, text: str, state: str = None, analysis: dict = None, user_agent: str = None, user_id: int = None):
     """Save an upload to the database"""
     db = get_db()
     if db is None:
@@ -147,7 +148,8 @@ def save_upload(doc_type: str, text: str, state: str = None, analysis: dict = No
             overall_risk=analysis.get("overall_risk") if analysis else None,
             risk_score=analysis.get("risk_score") if analysis else None,
             red_flag_count=len(analysis.get("red_flags", [])) if analysis else None,
-            user_agent=user_agent
+            user_agent=user_agent,
+            user_id=user_id
         )
         db.add(upload)
         db.commit()
@@ -1481,6 +1483,41 @@ async def get_me(request: Request):
     }
 
 
+@app.get("/api/user/history")
+async def get_user_history(request: Request):
+    """Get user's document analysis history"""
+    user = get_current_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    db = get_db()
+    if db is None:
+        return {"uploads": []}
+
+    try:
+        uploads = db.query(Upload).filter(
+            Upload.user_id == user.id
+        ).order_by(Upload.created_at.desc()).limit(50).all()
+
+        return {
+            "uploads": [
+                {
+                    "id": u.id,
+                    "created_at": u.created_at.isoformat() if u.created_at else None,
+                    "document_type": u.document_type,
+                    "overall_risk": u.overall_risk,
+                    "risk_score": u.risk_score
+                }
+                for u in uploads
+            ]
+        }
+    except Exception as e:
+        print(f"Error fetching history: {e}")
+        return {"uploads": []}
+    finally:
+        db.close()
+
+
 # ============== STRIPE PAYMENT ENDPOINTS ==============
 
 class CheckoutInput(BaseModel):
@@ -2192,7 +2229,7 @@ async def check_coi_compliance(input: COIComplianceInput, request: Request):
             coi_data = mock_coi_extract(input.coi_text)
             result = mock_compliance_check(coi_data, requirements, input.state)
             # Save upload
-            save_upload("coi", input.coi_text, input.state, result)
+            save_upload("coi", input.coi_text, input.state, result, user_id=user.id if user else None)
             report = ComplianceReport(**result)
             report.document_hash = doc_hash
             report.is_premium = is_premium
@@ -2242,7 +2279,7 @@ async def check_coi_compliance(input: COIComplianceInput, request: Request):
         result['extraction_metadata'] = extraction_metadata
 
         # Save upload
-        save_upload("coi", input.coi_text, input.state, result)
+        save_upload("coi", input.coi_text, input.state, result, user_id=user.id if user else None)
 
         report = ComplianceReport(**result)
         report.document_hash = doc_hash
@@ -2921,7 +2958,7 @@ async def analyze_lease(input: LeaseAnalysisInput, request: Request):
         # Mock mode
         if MOCK_MODE:
             result = mock_lease_analysis(input.lease_text, input.state)
-            save_upload("lease", input.lease_text, input.state, result)
+            save_upload("lease", input.lease_text, input.state, result, user_id=user.id if user else None)
             report = LeaseAnalysisReport(**result)
             report.document_hash = doc_hash
             report.is_premium = is_premium
@@ -2974,7 +3011,7 @@ async def analyze_lease(input: LeaseAnalysisInput, request: Request):
             "risk_score": analysis.get("risk_score", 50),
             "red_flags": analysis.get("red_flags", [])
         }
-        save_upload("lease", input.lease_text, input.state, result)
+        save_upload("lease", input.lease_text, input.state, result, user_id=user.id if user else None)
 
         # Calculate total issues for teaser
         red_flags = analysis.get("red_flags", [])
@@ -3368,7 +3405,7 @@ async def analyze_gym_contract(input: GymContractInput, request: Request):
 
         if MOCK_MODE:
             result = mock_gym_analysis(input.contract_text, input.state)
-            save_upload("gym", input.contract_text, input.state, result)
+            save_upload("gym", input.contract_text, input.state, result, user_id=user.id if user else None)
             report = GymContractReport(**result)
             report.document_hash = doc_hash
             report.is_premium = is_premium
@@ -3398,7 +3435,7 @@ async def analyze_gym_contract(input: GymContractInput, request: Request):
                 response_text = response_text[4:]
 
         result = json.loads(response_text.strip())
-        save_upload("gym", input.contract_text, input.state, result)
+        save_upload("gym", input.contract_text, input.state, result, user_id=user.id if user else None)
 
         report = GymContractReport(**result)
         report.document_hash = doc_hash
@@ -3713,7 +3750,7 @@ async def analyze_employment_contract(input: EmploymentContractInput, request: R
 
         if MOCK_MODE:
             result = mock_employment_analysis(input.contract_text, input.state, input.salary)
-            save_upload("employment", input.contract_text, input.state, result)
+            save_upload("employment", input.contract_text, input.state, result, user_id=user.id if user else None)
             report = EmploymentContractReport(**result)
             report.document_hash = doc_hash
             report.is_premium = is_premium
@@ -3743,7 +3780,7 @@ async def analyze_employment_contract(input: EmploymentContractInput, request: R
                 response_text = response_text[4:]
 
         result = json.loads(response_text.strip())
-        save_upload("employment", input.contract_text, input.state, result)
+        save_upload("employment", input.contract_text, input.state, result, user_id=user.id if user else None)
 
         report = EmploymentContractReport(**result)
         report.document_hash = doc_hash
@@ -3969,7 +4006,7 @@ async def analyze_freelancer_contract(input: FreelancerContractInput, request: R
 
         if MOCK_MODE:
             result = mock_freelancer_analysis(input.contract_text, input.project_value)
-            save_upload("freelancer", input.contract_text, None, result)
+            save_upload("freelancer", input.contract_text, None, result, user_id=user.id if user else None)
             report = FreelancerContractReport(**result)
             report.document_hash = doc_hash
             report.is_premium = is_premium
@@ -4024,7 +4061,7 @@ Return ONLY valid JSON."""
                 response_text = response_text[4:]
 
         result = json.loads(response_text.strip())
-        save_upload("freelancer", input.contract_text, None, result)
+        save_upload("freelancer", input.contract_text, None, result, user_id=user.id if user else None)
 
         report = FreelancerContractReport(**result)
         report.document_hash = doc_hash
@@ -4283,7 +4320,7 @@ async def analyze_influencer_contract(input: InfluencerContractInput, request: R
 
         if MOCK_MODE:
             result = mock_influencer_analysis(input.contract_text, input.base_rate)
-            save_upload("influencer", input.contract_text, None, result)
+            save_upload("influencer", input.contract_text, None, result, user_id=user.id if user else None)
             report = InfluencerContractReport(**result)
             report.document_hash = doc_hash
             report.is_premium = is_premium
@@ -4340,7 +4377,7 @@ Return ONLY valid JSON."""
                 response_text = response_text[4:]
 
         result = json.loads(response_text.strip())
-        save_upload("influencer", input.contract_text, None, result)
+        save_upload("influencer", input.contract_text, None, result, user_id=user.id if user else None)
 
         report = InfluencerContractReport(**result)
         report.document_hash = doc_hash
@@ -4592,7 +4629,7 @@ async def analyze_timeshare_contract(input: TimeshareContractInput, request: Req
                 input.purchase_price,
                 input.annual_fee
             )
-            save_upload("timeshare", input.contract_text, input.state, result)
+            save_upload("timeshare", input.contract_text, input.state, result, user_id=user.id if user else None)
             report = TimeshareContractReport(**result)
             report.document_hash = doc_hash
             report.is_premium = is_premium
@@ -4652,7 +4689,7 @@ Return ONLY valid JSON."""
                 response_text = response_text[4:]
 
         result = json.loads(response_text.strip())
-        save_upload("timeshare", input.contract_text, input.state, result)
+        save_upload("timeshare", input.contract_text, input.state, result, user_id=user.id if user else None)
 
         report = TimeshareContractReport(**result)
         report.document_hash = doc_hash
@@ -4876,7 +4913,7 @@ async def analyze_insurance_policy(input: InsurancePolicyInput, request: Request
 
         if MOCK_MODE:
             result = mock_insurance_policy_analysis(input.policy_text, input.policy_type, input.state)
-            save_upload("insurance_policy", input.policy_text, input.state, result)
+            save_upload("insurance_policy", input.policy_text, input.state, result, user_id=user.id if user else None)
             report = InsurancePolicyReport(**result)
             report.document_hash = doc_hash
             report.is_premium = is_premium
@@ -4931,7 +4968,7 @@ Return ONLY valid JSON."""
                 response_text = response_text[4:]
 
         result = json.loads(response_text.strip())
-        save_upload("insurance_policy", input.policy_text, input.state, result)
+        save_upload("insurance_policy", input.policy_text, input.state, result, user_id=user.id if user else None)
 
         report = InsurancePolicyReport(**result)
         report.document_hash = doc_hash
