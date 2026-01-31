@@ -36,6 +36,8 @@ body {
   margin: 0 auto;
   background: var(--pixel-bg);
   box-shadow: 0 0 50px rgba(0,0,0,0.1);
+  border-left: 2px solid var(--pixel-border);
+  border-right: 2px solid var(--pixel-border);
 }
 
 .app.scanlines::before {
@@ -65,6 +67,18 @@ body {
   position: relative;
 }
 
+.header::before {
+  content: '╔══════════════════════════════════════════════════════════════╗';
+  display: block;
+  font-family: 'VT323', monospace;
+  font-size: 14px;
+  letter-spacing: 2px;
+  color: var(--pixel-border);
+  text-align: center;
+  padding: 8px 0 0;
+  overflow: hidden;
+}
+
 .logo {
   display: flex;
   align-items: center;
@@ -86,10 +100,10 @@ body {
 }
 
 .tagline {
-  font-size: 16px;
-  margin-top: 8px;
+  font-size: 20px;
+  margin-top: 12px;
   color: var(--pixel-text);
-  opacity: 0.7;
+  opacity: 1;
   letter-spacing: 1px;
 }
 
@@ -165,19 +179,45 @@ body {
 
 /* DROPZONE */
 .dropzone {
-  border: 4px dashed var(--pixel-border);
+  border: 4px solid var(--pixel-border);
+  outline: 2px solid var(--pixel-border);
+  outline-offset: 4px;
   padding: 30px;
   text-align: center;
   margin-bottom: 15px;
   cursor: pointer;
   transition: all 0.1s;
   background: var(--pixel-bg);
+  position: relative;
+}
+
+.dropzone::before {
+  content: '┌─────────────────────────────────────────┐';
+  position: absolute;
+  top: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: 'VT323', monospace;
+  font-size: 16px;
+  color: var(--pixel-border);
+  white-space: nowrap;
+}
+
+.dropzone::after {
+  content: '└─────────────────────────────────────────┘';
+  position: absolute;
+  bottom: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: 'VT323', monospace;
+  font-size: 16px;
+  color: var(--pixel-border);
+  white-space: nowrap;
 }
 
 .dropzone:hover,
 .dropzone.active {
   background: var(--pixel-accent-2);
-  border-style: solid;
 }
 
 .dropzone-icon {
@@ -498,6 +538,18 @@ body {
   border-top: 4px solid var(--pixel-border);
   background: var(--pixel-bg-dark);
   margin-top: 40px;
+}
+
+.footer::after {
+  content: '╚══════════════════════════════════════════════════════════════╝';
+  display: block;
+  font-family: 'VT323', monospace;
+  font-size: 14px;
+  letter-spacing: 2px;
+  color: var(--pixel-border);
+  text-align: center;
+  padding: 0 0 8px;
+  overflow: hidden;
 }
 
 .footer p {
