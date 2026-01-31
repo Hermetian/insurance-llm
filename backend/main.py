@@ -1345,11 +1345,12 @@ def mock_compliance_check(coi_data: dict, requirements: dict, state: str = None)
     # Check GL per occurrence
     coi_limit = parse_limit_to_number(coi_data.get('gl_limit_per_occurrence', '') or '')
     req_limit = requirements.get('gl_per_occurrence', 1000000)
+    gl_per_occ_value = coi_data.get('gl_limit_per_occurrence') or 'Not specified'
     if coi_limit >= req_limit:
         passed.append({
             "name": "GL Per Occurrence Limit",
             "required_value": f"${req_limit:,}",
-            "actual_value": coi_data.get('gl_limit_per_occurrence', 'Not specified'),
+            "actual_value": gl_per_occ_value,
             "status": "pass",
             "explanation": "Limit meets or exceeds requirement"
         })
@@ -1357,7 +1358,7 @@ def mock_compliance_check(coi_data: dict, requirements: dict, state: str = None)
         critical_gaps.append({
             "name": "GL Per Occurrence Limit",
             "required_value": f"${req_limit:,}",
-            "actual_value": coi_data.get('gl_limit_per_occurrence', 'Not specified'),
+            "actual_value": gl_per_occ_value,
             "status": "fail",
             "explanation": f"INADEQUATE COVERAGE: Limit is ${coi_limit:,} but contract requires ${req_limit:,}. This leaves a ${req_limit - coi_limit:,} gap in coverage."
         })
@@ -1365,11 +1366,12 @@ def mock_compliance_check(coi_data: dict, requirements: dict, state: str = None)
     # Check GL aggregate
     coi_agg = parse_limit_to_number(coi_data.get('gl_limit_aggregate', '') or '')
     req_agg = requirements.get('gl_aggregate', 2000000)
+    gl_agg_value = coi_data.get('gl_limit_aggregate') or 'Not specified'
     if coi_agg >= req_agg:
         passed.append({
             "name": "GL Aggregate Limit",
             "required_value": f"${req_agg:,}",
-            "actual_value": coi_data.get('gl_limit_aggregate', 'Not specified'),
+            "actual_value": gl_agg_value,
             "status": "pass",
             "explanation": "Aggregate limit meets or exceeds requirement"
         })
@@ -1377,7 +1379,7 @@ def mock_compliance_check(coi_data: dict, requirements: dict, state: str = None)
         critical_gaps.append({
             "name": "GL Aggregate Limit",
             "required_value": f"${req_agg:,}",
-            "actual_value": coi_data.get('gl_limit_aggregate', 'Not specified'),
+            "actual_value": gl_agg_value,
             "status": "fail",
             "explanation": f"INADEQUATE COVERAGE: Aggregate is ${coi_agg:,} but contract requires ${req_agg:,}."
         })
