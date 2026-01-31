@@ -2,31 +2,42 @@
 
 ## Session Summaries
 
-### 2026-02-01 - Monetization + Auth Implementation
+### 2026-02-01 - Simplified to Free + Optional Auth for History
+Removed premium/paywall features. App is now completely free with optional sign-in.
+
+**Changes Made:**
+- Removed `handleUnlockReport` function and all premium unlock logic
+- Removed `userCredits` state and credit-related setters
+- Removed premium metadata blocks from all 8 analyze functions
+- Removed premium state reset from `resetAll()`
+- Kept: auth system for history saving, affiliate offers during loading, donation link
+
+**Current Flow:**
+1. Users upload documents (no auth required)
+2. See affiliate offers during analysis loading
+3. Get full analysis results (no paywall)
+4. Optional: Sign in to save analysis history
+
+---
+
+### 2026-02-01 - Monetization + Auth Implementation (Initial)
 Implemented full monetization system with authentication:
 
 **Backend Changes:**
 - Added User, AuthSession, PremiumUnlock database models
 - Added auth endpoints: `/api/auth/signup`, `/api/auth/login`, `/api/auth/logout`, `/api/auth/me`
-- Added Stripe endpoints: `/api/create-checkout-session`, `/api/stripe-webhook`, `/api/unlock-report`, `/api/check-unlock/{hash}`
-- Modified all analyze endpoints to include `document_hash`, `is_premium`, and `total_issues` fields
+- Added `/api/user/history` endpoint for viewing past analyses
+- Added Stripe endpoints (not currently used): `/api/create-checkout-session`, `/api/stripe-webhook`
+- Modified analyze endpoints to track `user_id` on uploads
 - Added bcrypt and stripe to requirements.txt
 
 **Frontend Changes:**
 - Created `src/config/affiliates.ts` with affiliate offers mapped by document type
 - Added auth state management (login/signup/logout flow)
-- Added auth header to header with user email, credits badge, login/signup/logout buttons
+- Added history modal to view past analyses
 - Added loading overlay with contextual affiliate offers during analysis
 - Added auth modal for login/signup
-- Added premium upsell banner that appears after analysis
 - Added CSS styles for all new components
-
-**Monetization Flow:**
-1. Free users see affiliate offers during loading
-2. Free users get summary (risk score + top 3 issues) after analysis
-3. Premium upsell banner prompts for $3 unlock or sign up
-4. Authenticated users can purchase credits via Stripe
-5. Credits persist to account for future unlocks
 
 ---
 

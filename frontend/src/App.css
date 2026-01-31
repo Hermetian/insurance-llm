@@ -1699,3 +1699,94 @@ body {
     margin: 0 16px;
   }
 }
+
+/* ============== HISTORY MODAL ============== */
+
+.history-modal {
+  max-width: 500px;
+}
+
+.history-list {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.history-item {
+  background: var(--pixel-bg);
+  border: 2px solid var(--pixel-border);
+  padding: 12px;
+  margin-bottom: 8px;
+}
+
+.history-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.history-type {
+  font-family: 'Press Start 2P', cursive;
+  font-size: 10px;
+  color: var(--pixel-text);
+}
+
+.history-risk {
+  font-family: 'Press Start 2P', cursive;
+  font-size: 8px;
+  padding: 4px 8px;
+}
+
+.history-risk.risk-high {
+  background: var(--pixel-red);
+  color: #fff;
+}
+
+.history-risk.risk-medium {
+  background: var(--pixel-yellow);
+  color: #000;
+}
+
+.history-risk.risk-low {
+  background: var(--pixel-green);
+  color: #fff;
+}
+
+.history-item-meta {
+  display: flex;
+  justify-content: space-between;
+  font-family: 'VT323', monospace;
+  font-size: 16px;
+  color: var(--pixel-gray);
+}
+
+.loading-text {
+  text-align: center;
+  color: var(--pixel-gray);
+}
+
+/* ============== DONATE LINK ============== */
+
+.donate-link {
+  display: inline-block;
+  font-family: 'Press Start 2P', cursive;
+  font-size: 10px;
+  padding: 12px 20px;
+  background: var(--pixel-yellow);
+  color: #000;
+  text-decoration: none;
+  border: 2px solid var(--pixel-border);
+  margin-top: 16px;
+  transition: all 0.1s;
+}
+
+.donate-link:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 2px 2px 0 var(--pixel-shadow);
+  background: #ffe066;
+}
+
+.footer {
+  text-align: center;
+  padding: 32px 16px;
+}

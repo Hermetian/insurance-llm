@@ -325,7 +325,6 @@ function App() {
   // Auth state
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [userEmail, setUserEmail] = useState<string | null>(null)
-  const [userCredits, setUserCredits] = useState(0)
   const [authToken, setAuthToken] = useState<string | null>(() => localStorage.getItem('auth_token'))
   const [showAuthModal, setShowAuthModal] = useState(false)
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('signup')
@@ -334,10 +333,16 @@ function App() {
   const [authError, setAuthError] = useState<string | null>(null)
   const [authLoading, setAuthLoading] = useState(false)
 
-  // Premium/payment state
-  const [currentDocumentHash, setCurrentDocumentHash] = useState<string | null>(null)
-  const [isPremiumUnlocked, setIsPremiumUnlocked] = useState(false)
-  const [showPremiumUpsell, setShowPremiumUpsell] = useState(false)
+  // History state
+  const [showHistoryModal, setShowHistoryModal] = useState(false)
+  const [userHistory, setUserHistory] = useState<Array<{
+    id: number
+    created_at: string
+    document_type: string
+    overall_risk: string
+    risk_score: number
+  }>>([])
+  const [historyLoading, setHistoryLoading] = useState(false)
 
   // Affiliate offer state
   const [currentOffer, setCurrentOffer] = useState<AffiliateOffer | null>(null)
@@ -356,7 +361,6 @@ function App() {
         if (data.authenticated) {
           setIsLoggedIn(true)
           setUserEmail(data.user.email)
-          setUserCredits(data.user.credits)
         } else {
           // Token invalid, clear it
           localStorage.removeItem('auth_token')
@@ -413,7 +417,6 @@ function App() {
       setAuthToken(data.token)
       setIsLoggedIn(true)
       setUserEmail(data.user.email)
-      setUserCredits(data.user.credits)
       setShowAuthModal(false)
       setAuthEmail('')
       setAuthPassword('')
@@ -447,7 +450,6 @@ function App() {
       setAuthToken(data.token)
       setIsLoggedIn(true)
       setUserEmail(data.user.email)
-      setUserCredits(data.user.credits)
       setShowAuthModal(false)
       setAuthEmail('')
       setAuthPassword('')
@@ -473,72 +475,33 @@ function App() {
     setAuthToken(null)
     setIsLoggedIn(false)
     setUserEmail(null)
-    setUserCredits(0)
+    setUserHistory([])
   }
 
-  // Premium unlock functions
-  const handleUnlockReport = async () => {
-    if (!currentDocumentHash) return
+  // Fetch user history
+  const fetchHistory = async () => {
+    if (!authToken) return
 
-    if (!isLoggedIn) {
-      // Show auth modal first
-      setShowAuthModal(true)
-      return
-    }
-
-    if (userCredits > 0) {
-      // Use existing credit
-      try {
-        const res = await fetch(`${API_BASE}/api/unlock-report`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${authToken}`
-          },
-          body: JSON.stringify({ document_hash: currentDocumentHash })
-        })
-
+    setHistoryLoading(true)
+    try {
+      const res = await fetch(`${API_BASE}/api/user/history`, {
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      })
+      if (res.ok) {
         const data = await res.json()
-
-        if (res.ok) {
-          setIsPremiumUnlocked(true)
-          setUserCredits(data.credits)
-          setShowPremiumUpsell(false)
-        } else {
-          throw new Error(data.detail || 'Unlock failed')
-        }
-      } catch (err) {
-        console.error('Unlock error:', err)
-        alert('Failed to unlock report. Please try again.')
+        setUserHistory(data.uploads || [])
       }
-    } else {
-      // Redirect to Stripe checkout
-      try {
-        const res = await fetch(`${API_BASE}/api/create-checkout-session`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${authToken}`
-          },
-          body: JSON.stringify({
-            document_hash: currentDocumentHash,
-            success_url: window.location.href,
-            cancel_url: window.location.href
-          })
-        })
-
-        const data = await res.json()
-
-        if (res.ok && data.checkout_url) {
-          window.location.href = data.checkout_url
-        } else {
-          throw new Error(data.detail || 'Failed to create checkout')
-        }
-      } catch (err) {
-        console.error('Checkout error:', err)
-        alert('Failed to start checkout. Please try again.')
-      }
+    } catch (err) {
+      console.error('Failed to fetch history:', err)
+    } finally {
+      setHistoryLoading(false)
     }
+  }
+
+  // Fetch history when modal opens
+  const openHistoryModal = () => {
+    setShowHistoryModal(true)
+    fetchHistory()
   }
 
   const classifyDocument = async (text: string): Promise<ClassifyResult | null> => {
@@ -759,15 +722,6 @@ function App() {
       const data = await res.json()
       setComplianceReport(data)
       setComplianceTab('report')
-
-      // Handle premium metadata
-      if (data.document_hash) {
-        setCurrentDocumentHash(data.document_hash)
-        setIsPremiumUnlocked(data.is_premium || false)
-        if (!data.is_premium) {
-          setShowPremiumUpsell(true)
-        }
-      }
     } catch (err) {
       console.error(err)
       alert('Failed to check compliance. Make sure the backend is running!')
@@ -800,15 +754,6 @@ function App() {
       const data = await res.json()
       setLeaseReport(data)
       setLeaseTab('report')
-
-      // Handle premium metadata
-      if (data.document_hash) {
-        setCurrentDocumentHash(data.document_hash)
-        setIsPremiumUnlocked(data.is_premium || false)
-        if (!data.is_premium) {
-          setShowPremiumUpsell(true)
-        }
-      }
     } catch (err) {
       console.error(err)
       alert('Failed to analyze lease. Make sure the backend is running!')
@@ -840,15 +785,6 @@ function App() {
       const data = await res.json()
       setGymReport(data)
       setGymTab('report')
-
-      // Handle premium metadata
-      if (data.document_hash) {
-        setCurrentDocumentHash(data.document_hash)
-        setIsPremiumUnlocked(data.is_premium || false)
-        if (!data.is_premium) {
-          setShowPremiumUpsell(true)
-        }
-      }
     } catch (err) {
       console.error(err)
       alert('Failed to analyze gym contract. Make sure the backend is running!')
@@ -880,15 +816,6 @@ function App() {
       const data = await res.json()
       setEmploymentReport(data)
       setEmploymentTab('report')
-
-      // Handle premium metadata
-      if (data.document_hash) {
-        setCurrentDocumentHash(data.document_hash)
-        setIsPremiumUnlocked(data.is_premium || false)
-        if (!data.is_premium) {
-          setShowPremiumUpsell(true)
-        }
-      }
     } catch (err) {
       console.error(err)
       alert('Failed to analyze employment contract. Make sure the backend is running!')
@@ -919,15 +846,6 @@ function App() {
       const data = await res.json()
       setFreelancerReport(data)
       setFreelancerTab('report')
-
-      // Handle premium metadata
-      if (data.document_hash) {
-        setCurrentDocumentHash(data.document_hash)
-        setIsPremiumUnlocked(data.is_premium || false)
-        if (!data.is_premium) {
-          setShowPremiumUpsell(true)
-        }
-      }
     } catch (err) {
       console.error(err)
       alert('Failed to analyze freelancer contract. Make sure the backend is running!')
@@ -958,15 +876,6 @@ function App() {
       const data = await res.json()
       setInfluencerReport(data)
       setInfluencerTab('report')
-
-      // Handle premium metadata
-      if (data.document_hash) {
-        setCurrentDocumentHash(data.document_hash)
-        setIsPremiumUnlocked(data.is_premium || false)
-        if (!data.is_premium) {
-          setShowPremiumUpsell(true)
-        }
-      }
     } catch (err) {
       console.error(err)
       alert('Failed to analyze influencer contract. Make sure the backend is running!')
@@ -998,15 +907,6 @@ function App() {
       const data = await res.json()
       setTimeshareReport(data)
       setTimeshareTab('report')
-
-      // Handle premium metadata
-      if (data.document_hash) {
-        setCurrentDocumentHash(data.document_hash)
-        setIsPremiumUnlocked(data.is_premium || false)
-        if (!data.is_premium) {
-          setShowPremiumUpsell(true)
-        }
-      }
     } catch (err) {
       console.error(err)
       alert('Failed to analyze timeshare contract. Make sure the backend is running!')
@@ -1038,15 +938,6 @@ function App() {
       const data = await res.json()
       setInsurancePolicyReport(data)
       setInsurancePolicyTab('report')
-
-      // Handle premium metadata
-      if (data.document_hash) {
-        setCurrentDocumentHash(data.document_hash)
-        setIsPremiumUnlocked(data.is_premium || false)
-        if (!data.is_premium) {
-          setShowPremiumUpsell(true)
-        }
-      }
     } catch (err) {
       console.error(err)
       alert('Failed to analyze insurance policy. Make sure the backend is running!')
@@ -1090,10 +981,6 @@ function App() {
     setDisclaimerAccepted(false)
     setDisclaimerInput('')
     setPendingAnalysis(null)
-    // Reset premium state
-    setCurrentDocumentHash(null)
-    setIsPremiumUnlocked(false)
-    setShowPremiumUpsell(false)
     setCurrentOffer(null)
   }
 
@@ -1174,14 +1061,13 @@ function App() {
             {isLoggedIn ? (
               <>
                 <span className="user-email">{userEmail}</span>
-                {userCredits > 0 && <span className="credits-badge">{userCredits} credits</span>}
+                <button className="auth-btn" onClick={openHistoryModal}>History</button>
                 <button className="auth-btn logout-btn" onClick={handleLogout}>Log Out</button>
               </>
             ) : (
-              <>
-                <button className="auth-btn login-btn" onClick={() => { setAuthMode('login'); setShowAuthModal(true) }}>Log In</button>
-                <button className="auth-btn signup-btn" onClick={() => { setAuthMode('signup'); setShowAuthModal(true) }}>Sign Up</button>
-              </>
+              <button className="auth-btn signup-btn" onClick={() => { setAuthMode('signup'); setShowAuthModal(true) }}>
+                Sign In to Save History
+              </button>
             )}
           </div>
         </div>
@@ -2691,9 +2577,7 @@ function App() {
             </div>
             <div className="modal-content">
               <p className="auth-benefit">
-                {authMode === 'signup'
-                  ? 'Create an account to unlock full reports and save your credits.'
-                  : 'Welcome back! Log in to access your account.'}
+                Sign in to save your analysis history and access it anytime.
               </p>
 
               {authError && (
@@ -2743,31 +2627,59 @@ function App() {
         </div>
       )}
 
-      {/* Premium Upsell Modal */}
-      {showPremiumUpsell && !isPremiumUnlocked && (
-        <div className="premium-upsell-banner">
-          <div className="upsell-content">
-            <span className="upsell-icon">[LOCK]</span>
-            <div className="upsell-text">
-              <strong>You're seeing the summary.</strong>
-              {' '}Unlock the full report with all findings, detailed analysis, and letter templates.
+      {/* History Modal */}
+      {showHistoryModal && (
+        <div className="modal-overlay" onClick={() => setShowHistoryModal(false)}>
+          <div className="modal history-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <span className="modal-icon">[H]</span>
+              <h2>YOUR HISTORY</h2>
             </div>
-            <button className="pixel-btn primary unlock-btn" onClick={handleUnlockReport}>
-              {isLoggedIn
-                ? userCredits > 0
-                  ? `[USE 1 CREDIT] (${userCredits} left)`
-                  : '[UNLOCK - $3]'
-                : '[SIGN UP TO UNLOCK]'}
-            </button>
-            <button className="pixel-btn secondary" onClick={() => setShowPremiumUpsell(false)}>
-              [DISMISS]
-            </button>
+            <div className="modal-content">
+              {historyLoading ? (
+                <p className="loading-text">Loading...</p>
+              ) : userHistory.length === 0 ? (
+                <p>No documents analyzed yet. Upload one to get started!</p>
+              ) : (
+                <div className="history-list">
+                  {userHistory.map((item) => (
+                    <div key={item.id} className="history-item">
+                      <div className="history-item-header">
+                        <span className="history-type">{item.document_type.toUpperCase()}</span>
+                        <span className={`history-risk risk-${item.overall_risk}`}>
+                          {item.overall_risk.toUpperCase()}
+                        </span>
+                      </div>
+                      <div className="history-item-meta">
+                        <span className="history-score">Score: {item.risk_score}/100</span>
+                        <span className="history-date">
+                          {new Date(item.created_at).toLocaleDateString()}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="modal-buttons">
+                <button className="pixel-btn secondary" onClick={() => setShowHistoryModal(false)}>
+                  [CLOSE]
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
 
       <footer className="footer">
         <p>* Created by Robert Cordwell *</p>
+        <a
+          href="https://donate.stripe.com/YOUR_STRIPE_DONATION_LINK"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="donate-link"
+        >
+          [BUY ME A COFFEE]
+        </a>
       </footer>
     </div>
   )
