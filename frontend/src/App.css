@@ -22,7 +22,7 @@
 body {
   margin: 0;
   padding: 0;
-  background-color: var(--pixel-bg);
+  background-color: #d4d0c4;
   font-family: 'VT323', monospace;
   color: var(--pixel-text);
   font-size: 18px;

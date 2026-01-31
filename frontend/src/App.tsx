@@ -2293,7 +2293,7 @@ function App() {
       )}
 
       <footer className="footer">
-        <p>* NOT LEGAL ADVICE *</p>
+        <p>* Created by Robert Cordwell *</p>
       </footer>
     </div>
   )
