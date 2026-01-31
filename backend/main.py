@@ -1,21 +1,28 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Request, Response, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, EmailStr
 from typing import Optional
 from openai import OpenAI
 import json
 import os
 import re
 import base64
+import secrets
+import hashlib
 from pathlib import Path
 from dotenv import load_dotenv
-from datetime import datetime
+from datetime import datetime, timedelta
 from contextlib import asynccontextmanager
 
+# Auth imports
+import bcrypt
+import stripe
+
 # Database imports
-from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime, JSON, Boolean
+from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime, JSON, Boolean, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, relationship
 
 # Load .env file
 load_dotenv()
@@ -54,6 +61,49 @@ class Waitlist(Base):
     document_text_preview = Column(Text, nullable=True)  # First 500 chars
     notified = Column(Boolean, default=False)
     notified_at = Column(DateTime, nullable=True)
+
+
+# Auth models
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    email = Column(String(255), unique=True, index=True, nullable=False)
+    password_hash = Column(String(255), nullable=False)
+    credits = Column(Integer, default=0)  # Premium report credits
+    stripe_customer_id = Column(String(255), nullable=True)
+
+    # Relationships
+    sessions = relationship("AuthSession", back_populates="user")
+    unlocks = relationship("PremiumUnlock", back_populates="user")
+
+
+class AuthSession(Base):
+    __tablename__ = "auth_sessions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    token = Column(String(255), unique=True, index=True, nullable=False)
+    expires_at = Column(DateTime, nullable=False)
+
+    # Relationships
+    user = relationship("User", back_populates="sessions")
+
+
+class PremiumUnlock(Base):
+    """Track which documents a user has unlocked premium access for"""
+    __tablename__ = "premium_unlocks"
+
+    id = Column(Integer, primary_key=True, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    document_hash = Column(String(64), index=True, nullable=False)  # SHA256 of document text
+
+    # Relationships
+    user = relationship("User", back_populates="unlocks")
+
 
 def init_db():
     """Initialize database connection and create tables"""
@@ -132,6 +182,216 @@ def save_waitlist(email: str, doc_type: str, text_preview: str = None):
         return None
     finally:
         db.close()
+
+
+# ============== AUTH HELPER FUNCTIONS ==============
+
+def hash_password(password: str) -> str:
+    """Hash a password using bcrypt"""
+    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
+
+def verify_password(password: str, password_hash: str) -> bool:
+    """Verify a password against its hash"""
+    return bcrypt.checkpw(password.encode('utf-8'), password_hash.encode('utf-8'))
+
+
+def generate_session_token() -> str:
+    """Generate a secure random session token"""
+    return secrets.token_urlsafe(32)
+
+
+def hash_document(text: str) -> str:
+    """Create a hash of document text for tracking premium unlocks"""
+    return hashlib.sha256(text.encode('utf-8')).hexdigest()
+
+
+def create_user(email: str, password: str) -> Optional[User]:
+    """Create a new user"""
+    db = get_db()
+    if db is None:
+        return None
+
+    try:
+        user = User(
+            email=email.lower().strip(),
+            password_hash=hash_password(password)
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+        return user
+    except Exception as e:
+        print(f"Error creating user: {e}")
+        db.rollback()
+        return None
+    finally:
+        db.close()
+
+
+def get_user_by_email(email: str) -> Optional[User]:
+    """Get a user by email"""
+    db = get_db()
+    if db is None:
+        return None
+
+    try:
+        user = db.query(User).filter(User.email == email.lower().strip()).first()
+        return user
+    except Exception as e:
+        print(f"Error getting user: {e}")
+        return None
+    finally:
+        db.close()
+
+
+def create_session(user_id: int) -> Optional[str]:
+    """Create a new auth session and return the token"""
+    db = get_db()
+    if db is None:
+        return None
+
+    try:
+        token = generate_session_token()
+        session = AuthSession(
+            user_id=user_id,
+            token=token,
+            expires_at=datetime.utcnow() + timedelta(days=30)
+        )
+        db.add(session)
+        db.commit()
+        return token
+    except Exception as e:
+        print(f"Error creating session: {e}")
+        db.rollback()
+        return None
+    finally:
+        db.close()
+
+
+def get_user_from_token(token: str) -> Optional[User]:
+    """Get user from session token"""
+    if not token:
+        return None
+
+    db = get_db()
+    if db is None:
+        return None
+
+    try:
+        session = db.query(AuthSession).filter(
+            AuthSession.token == token,
+            AuthSession.expires_at > datetime.utcnow()
+        ).first()
+        if session:
+            return db.query(User).filter(User.id == session.user_id).first()
+        return None
+    except Exception as e:
+        print(f"Error getting user from token: {e}")
+        return None
+    finally:
+        db.close()
+
+
+def delete_session(token: str) -> bool:
+    """Delete a session (logout)"""
+    db = get_db()
+    if db is None:
+        return False
+
+    try:
+        db.query(AuthSession).filter(AuthSession.token == token).delete()
+        db.commit()
+        return True
+    except Exception as e:
+        print(f"Error deleting session: {e}")
+        db.rollback()
+        return False
+    finally:
+        db.close()
+
+
+def add_credits_to_user(user_id: int, credits: int) -> bool:
+    """Add credits to a user account"""
+    db = get_db()
+    if db is None:
+        return False
+
+    try:
+        user = db.query(User).filter(User.id == user_id).first()
+        if user:
+            user.credits += credits
+            db.commit()
+            return True
+        return False
+    except Exception as e:
+        print(f"Error adding credits: {e}")
+        db.rollback()
+        return False
+    finally:
+        db.close()
+
+
+def use_credit(user_id: int, document_hash: str) -> bool:
+    """Use a credit to unlock a document. Returns True if successful."""
+    db = get_db()
+    if db is None:
+        return False
+
+    try:
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user or user.credits < 1:
+            return False
+
+        # Check if already unlocked
+        existing = db.query(PremiumUnlock).filter(
+            PremiumUnlock.user_id == user_id,
+            PremiumUnlock.document_hash == document_hash
+        ).first()
+        if existing:
+            return True  # Already unlocked, no credit needed
+
+        # Deduct credit and record unlock
+        user.credits -= 1
+        unlock = PremiumUnlock(user_id=user_id, document_hash=document_hash)
+        db.add(unlock)
+        db.commit()
+        return True
+    except Exception as e:
+        print(f"Error using credit: {e}")
+        db.rollback()
+        return False
+    finally:
+        db.close()
+
+
+def check_premium_access(user_id: int, document_hash: str) -> bool:
+    """Check if user has premium access to a document"""
+    db = get_db()
+    if db is None:
+        return False
+
+    try:
+        unlock = db.query(PremiumUnlock).filter(
+            PremiumUnlock.user_id == user_id,
+            PremiumUnlock.document_hash == document_hash
+        ).first()
+        return unlock is not None
+    except Exception as e:
+        print(f"Error checking premium access: {e}")
+        return False
+    finally:
+        db.close()
+
+
+# Stripe configuration
+STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY")
+STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET")
+STRIPE_PRICE_UNLOCK = os.environ.get("STRIPE_PRICE_UNLOCK", "price_unlock_3usd")  # $3 per report
+
+if STRIPE_SECRET_KEY:
+    stripe.api_key = STRIPE_SECRET_KEY
+
 
 # Initialize database on startup
 init_db()
@@ -373,6 +633,11 @@ class ComplianceReport(BaseModel):
     # Extraction confidence metadata
     extraction_metadata: Optional[ExtractionMetadata] = None
 
+    # Premium access metadata
+    document_hash: Optional[str] = None
+    is_premium: bool = False
+    total_issues: Optional[int] = None
+
     def __init__(self, **data):
         for field in ['critical_gaps', 'warnings', 'passed']:
             if data.get(field) is None:
@@ -506,6 +771,11 @@ class LeaseAnalysisReport(BaseModel):
 
     # Negotiation letter
     negotiation_letter: str
+
+    # Premium access metadata
+    document_hash: Optional[str] = None
+    is_premium: bool = False
+    total_issues: Optional[int] = None  # For teaser: "12 more issues found"
 
 
 # Lease insurance red flags to check
@@ -1063,6 +1333,280 @@ Return ONLY valid JSON, no markdown formatting."""
 @app.get("/")
 def read_root():
     return {"status": "online", "message": "Insurance LLM API - Pixel Perfect Coverage Analysis"}
+
+
+# ============== AUTH MODELS & ENDPOINTS ==============
+
+class SignupInput(BaseModel):
+    email: str
+    password: str
+
+
+class LoginInput(BaseModel):
+    email: str
+    password: str
+
+
+class AuthResponse(BaseModel):
+    success: bool
+    message: str
+    user: Optional[dict] = None
+    token: Optional[str] = None
+
+
+class UserInfo(BaseModel):
+    email: str
+    credits: int
+    created_at: str
+
+
+def get_current_user(request: Request) -> Optional[User]:
+    """Extract current user from auth header or cookie"""
+    # Try Authorization header first
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header[7:]
+        return get_user_from_token(token)
+
+    # Try cookie
+    token = request.cookies.get("auth_token")
+    if token:
+        return get_user_from_token(token)
+
+    return None
+
+
+@app.post("/api/auth/signup", response_model=AuthResponse)
+async def signup(input: SignupInput, response: Response):
+    """Create a new user account"""
+    # Validate email format
+    if not input.email or '@' not in input.email:
+        raise HTTPException(status_code=400, detail="Invalid email address")
+
+    # Validate password
+    if not input.password or len(input.password) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+
+    # Check if user already exists
+    existing = get_user_by_email(input.email)
+    if existing:
+        raise HTTPException(status_code=400, detail="Email already registered")
+
+    # Create user
+    user = create_user(input.email, input.password)
+    if not user:
+        raise HTTPException(status_code=500, detail="Failed to create account")
+
+    # Create session
+    token = create_session(user.id)
+    if not token:
+        raise HTTPException(status_code=500, detail="Failed to create session")
+
+    # Set cookie
+    response.set_cookie(
+        key="auth_token",
+        value=token,
+        httponly=True,
+        max_age=30 * 24 * 60 * 60,  # 30 days
+        samesite="lax"
+    )
+
+    return AuthResponse(
+        success=True,
+        message="Account created successfully",
+        user={"email": user.email, "credits": user.credits},
+        token=token
+    )
+
+
+@app.post("/api/auth/login", response_model=AuthResponse)
+async def login(input: LoginInput, response: Response):
+    """Log in to existing account"""
+    # Get user
+    user = get_user_by_email(input.email)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+
+    # Verify password
+    if not verify_password(input.password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+
+    # Create session
+    token = create_session(user.id)
+    if not token:
+        raise HTTPException(status_code=500, detail="Failed to create session")
+
+    # Set cookie
+    response.set_cookie(
+        key="auth_token",
+        value=token,
+        httponly=True,
+        max_age=30 * 24 * 60 * 60,  # 30 days
+        samesite="lax"
+    )
+
+    return AuthResponse(
+        success=True,
+        message="Logged in successfully",
+        user={"email": user.email, "credits": user.credits},
+        token=token
+    )
+
+
+@app.post("/api/auth/logout")
+async def logout(request: Request, response: Response):
+    """Log out (delete session)"""
+    token = request.cookies.get("auth_token")
+    if token:
+        delete_session(token)
+
+    response.delete_cookie("auth_token")
+    return {"success": True, "message": "Logged out"}
+
+
+@app.get("/api/auth/me")
+async def get_me(request: Request):
+    """Get current user info"""
+    user = get_current_user(request)
+    if not user:
+        return {"authenticated": False, "user": None}
+
+    return {
+        "authenticated": True,
+        "user": {
+            "email": user.email,
+            "credits": user.credits,
+            "created_at": user.created_at.isoformat() if user.created_at else None
+        }
+    }
+
+
+# ============== STRIPE PAYMENT ENDPOINTS ==============
+
+class CheckoutInput(BaseModel):
+    document_hash: str
+    success_url: str
+    cancel_url: str
+
+
+@app.post("/api/create-checkout-session")
+async def create_checkout_session(input: CheckoutInput, request: Request):
+    """Create a Stripe checkout session for purchasing credits"""
+    if not STRIPE_SECRET_KEY:
+        raise HTTPException(status_code=500, detail="Stripe not configured")
+
+    user = get_current_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Must be logged in to purchase")
+
+    try:
+        # Create checkout session
+        checkout_session = stripe.checkout.Session.create(
+            payment_method_types=["card"],
+            line_items=[
+                {
+                    "price_data": {
+                        "currency": "usd",
+                        "product_data": {
+                            "name": "Full Report Unlock",
+                            "description": "Unlock the complete detailed analysis report"
+                        },
+                        "unit_amount": 300,  # $3.00 in cents
+                    },
+                    "quantity": 1,
+                }
+            ],
+            mode="payment",
+            success_url=input.success_url + "?session_id={CHECKOUT_SESSION_ID}",
+            cancel_url=input.cancel_url,
+            metadata={
+                "user_id": str(user.id),
+                "document_hash": input.document_hash
+            }
+        )
+
+        return {"checkout_url": checkout_session.url, "session_id": checkout_session.id}
+
+    except Exception as e:
+        print(f"Stripe error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to create checkout session")
+
+
+@app.post("/api/stripe-webhook")
+async def stripe_webhook(request: Request):
+    """Handle Stripe webhook events"""
+    if not STRIPE_SECRET_KEY or not STRIPE_WEBHOOK_SECRET:
+        raise HTTPException(status_code=500, detail="Stripe not configured")
+
+    payload = await request.body()
+    sig_header = request.headers.get("stripe-signature")
+
+    try:
+        event = stripe.Webhook.construct_event(
+            payload, sig_header, STRIPE_WEBHOOK_SECRET
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail="Invalid payload")
+    except stripe.error.SignatureVerificationError as e:
+        raise HTTPException(status_code=400, detail="Invalid signature")
+
+    # Handle checkout.session.completed
+    if event["type"] == "checkout.session.completed":
+        session = event["data"]["object"]
+        metadata = session.get("metadata", {})
+
+        user_id = metadata.get("user_id")
+        document_hash = metadata.get("document_hash")
+
+        if user_id and document_hash:
+            # Add credit and unlock document
+            add_credits_to_user(int(user_id), 1)
+            use_credit(int(user_id), document_hash)
+            print(f"Unlocked document {document_hash} for user {user_id}")
+
+    return {"received": True}
+
+
+@app.post("/api/unlock-report")
+async def unlock_report(request: Request):
+    """Use a credit to unlock a report (for users with existing credits)"""
+    body = await request.json()
+    document_hash = body.get("document_hash")
+
+    if not document_hash:
+        raise HTTPException(status_code=400, detail="document_hash required")
+
+    user = get_current_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Must be logged in")
+
+    # Check if already unlocked
+    if check_premium_access(user.id, document_hash):
+        return {"success": True, "message": "Already unlocked", "credits": user.credits}
+
+    # Try to use a credit
+    if use_credit(user.id, document_hash):
+        # Refresh user to get updated credits
+        refreshed_user = get_user_by_email(user.email)
+        return {
+            "success": True,
+            "message": "Report unlocked",
+            "credits": refreshed_user.credits if refreshed_user else user.credits - 1
+        }
+    else:
+        raise HTTPException(status_code=402, detail="No credits available. Please purchase more.")
+
+
+@app.get("/api/check-unlock/{document_hash}")
+async def check_unlock(document_hash: str, request: Request):
+    """Check if user has unlocked a specific document"""
+    user = get_current_user(request)
+    if not user:
+        return {"unlocked": False, "authenticated": False}
+
+    unlocked = check_premium_access(user.id, document_hash)
+    return {"unlocked": unlocked, "authenticated": True, "credits": user.credits}
+
 
 # Waitlist signup model
 class WaitlistInput(BaseModel):
@@ -1622,9 +2166,16 @@ Regards,
     }
 
 @app.post("/api/check-coi-compliance", response_model=ComplianceReport)
-async def check_coi_compliance(input: COIComplianceInput):
+async def check_coi_compliance(input: COIComplianceInput, request: Request):
     """Check a Certificate of Insurance against contract requirements"""
     try:
+        # Compute document hash and check premium access
+        doc_hash = hash_document(input.coi_text)
+        user = get_current_user(request)
+        is_premium = False
+        if user:
+            is_premium = check_premium_access(user.id, doc_hash)
+
         # Get requirements from preset or custom
         if input.project_type and input.project_type in PROJECT_TYPE_REQUIREMENTS:
             requirements = PROJECT_TYPE_REQUIREMENTS[input.project_type]
@@ -1642,7 +2193,11 @@ async def check_coi_compliance(input: COIComplianceInput):
             result = mock_compliance_check(coi_data, requirements, input.state)
             # Save upload
             save_upload("coi", input.coi_text, input.state, result)
-            return ComplianceReport(**result)
+            report = ComplianceReport(**result)
+            report.document_hash = doc_hash
+            report.is_premium = is_premium
+            report.total_issues = len(result.get("critical_gaps", [])) + len(result.get("warnings", []))
+            return report
 
         # Step 1: Extract COI data
         extract_prompt = COI_EXTRACTION_PROMPT.replace("<<DOCUMENT>>", input.coi_text)
@@ -1689,7 +2244,11 @@ async def check_coi_compliance(input: COIComplianceInput):
         # Save upload
         save_upload("coi", input.coi_text, input.state, result)
 
-        return ComplianceReport(**result)
+        report = ComplianceReport(**result)
+        report.document_hash = doc_hash
+        report.is_premium = is_premium
+        report.total_issues = len(result.get("critical_gaps", [])) + len(result.get("warnings", []))
+        return report
 
     except json.JSONDecodeError as e:
         raise HTTPException(status_code=500, detail=f"Failed to parse response: {str(e)}")
@@ -2349,14 +2908,25 @@ Best regards,
 
 
 @app.post("/api/analyze-lease", response_model=LeaseAnalysisReport)
-async def analyze_lease(input: LeaseAnalysisInput):
+async def analyze_lease(input: LeaseAnalysisInput, request: Request):
     """Analyze a lease for insurance-related red flags and risks"""
     try:
+        # Compute document hash and check premium access
+        doc_hash = hash_document(input.lease_text)
+        user = get_current_user(request)
+        is_premium = False
+        if user:
+            is_premium = check_premium_access(user.id, doc_hash)
+
         # Mock mode
         if MOCK_MODE:
             result = mock_lease_analysis(input.lease_text, input.state)
             save_upload("lease", input.lease_text, input.state, result)
-            return LeaseAnalysisReport(**result)
+            report = LeaseAnalysisReport(**result)
+            report.document_hash = doc_hash
+            report.is_premium = is_premium
+            report.total_issues = len(result.get("red_flags", [])) + len(result.get("missing_protections", []))
+            return report
 
         client = get_client()
 
@@ -2406,6 +2976,11 @@ async def analyze_lease(input: LeaseAnalysisInput):
         }
         save_upload("lease", input.lease_text, input.state, result)
 
+        # Calculate total issues for teaser
+        red_flags = analysis.get("red_flags", [])
+        missing_protections = analysis.get("missing_protections", [])
+        total_issues = len(red_flags) + len(missing_protections)
+
         return LeaseAnalysisReport(
             overall_risk=analysis.get("overall_risk", "medium"),
             risk_score=analysis.get("risk_score", 50),
@@ -2415,10 +2990,13 @@ async def analyze_lease(input: LeaseAnalysisInput):
             property_address=lease_data.get("property_address"),
             lease_term=lease_data.get("lease_term"),
             insurance_requirements=[LeaseInsuranceClause(**r) for r in analysis.get("insurance_requirements", [])],
-            red_flags=[LeaseRedFlag(**r) for r in analysis.get("red_flags", [])],
-            missing_protections=analysis.get("missing_protections", []),
+            red_flags=[LeaseRedFlag(**r) for r in red_flags],
+            missing_protections=missing_protections,
             summary=analysis.get("summary", "Analysis complete."),
-            negotiation_letter=analysis.get("negotiation_letter", "")
+            negotiation_letter=analysis.get("negotiation_letter", ""),
+            document_hash=doc_hash,
+            is_premium=is_premium,
+            total_issues=total_issues
         )
 
     except json.JSONDecodeError as e:
@@ -2451,6 +3029,11 @@ class GymContractReport(BaseModel):
     state_protections: list[str]
     summary: str
     cancellation_guide: str
+
+    # Premium access metadata
+    document_hash: Optional[str] = None
+    is_premium: bool = False
+    total_issues: Optional[int] = None
 
 # State gym protections
 STATE_GYM_PROTECTIONS = {
@@ -2773,13 +3356,24 @@ Return ONLY valid JSON."""
 
 
 @app.post("/api/analyze-gym", response_model=GymContractReport)
-async def analyze_gym_contract(input: GymContractInput):
+async def analyze_gym_contract(input: GymContractInput, request: Request):
     """Analyze a gym membership contract for red flags"""
     try:
+        # Compute document hash and check premium access
+        doc_hash = hash_document(input.contract_text)
+        user = get_current_user(request)
+        is_premium = False
+        if user:
+            is_premium = check_premium_access(user.id, doc_hash)
+
         if MOCK_MODE:
             result = mock_gym_analysis(input.contract_text, input.state)
             save_upload("gym", input.contract_text, input.state, result)
-            return GymContractReport(**result)
+            report = GymContractReport(**result)
+            report.document_hash = doc_hash
+            report.is_premium = is_premium
+            report.total_issues = len(result.get("red_flags", []))
+            return report
 
         client = get_client()
 
@@ -2805,7 +3399,12 @@ async def analyze_gym_contract(input: GymContractInput):
 
         result = json.loads(response_text.strip())
         save_upload("gym", input.contract_text, input.state, result)
-        return GymContractReport(**result)
+
+        report = GymContractReport(**result)
+        report.document_hash = doc_hash
+        report.is_premium = is_premium
+        report.total_issues = len(result.get("red_flags", []))
+        return report
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Gym contract analysis failed: {str(e)}")
@@ -2837,6 +3436,11 @@ class EmploymentContractReport(BaseModel):
     state_notes: list[str]
     summary: str
     negotiation_points: str
+
+    # Premium access metadata
+    document_hash: Optional[str] = None
+    is_premium: bool = False
+    total_issues: Optional[int] = None
 
 # States that ban/restrict non-competes
 NON_COMPETE_STATES = {
@@ -3097,13 +3701,24 @@ Return ONLY valid JSON."""
 
 
 @app.post("/api/analyze-employment", response_model=EmploymentContractReport)
-async def analyze_employment_contract(input: EmploymentContractInput):
+async def analyze_employment_contract(input: EmploymentContractInput, request: Request):
     """Analyze an employment contract for problematic terms"""
     try:
+        # Compute document hash and check premium access
+        doc_hash = hash_document(input.contract_text)
+        user = get_current_user(request)
+        is_premium = False
+        if user:
+            is_premium = check_premium_access(user.id, doc_hash)
+
         if MOCK_MODE:
             result = mock_employment_analysis(input.contract_text, input.state, input.salary)
             save_upload("employment", input.contract_text, input.state, result)
-            return EmploymentContractReport(**result)
+            report = EmploymentContractReport(**result)
+            report.document_hash = doc_hash
+            report.is_premium = is_premium
+            report.total_issues = len(result.get("red_flags", []))
+            return report
 
         client = get_client()
 
@@ -3129,7 +3744,12 @@ async def analyze_employment_contract(input: EmploymentContractInput):
 
         result = json.loads(response_text.strip())
         save_upload("employment", input.contract_text, input.state, result)
-        return EmploymentContractReport(**result)
+
+        report = EmploymentContractReport(**result)
+        report.document_hash = doc_hash
+        report.is_premium = is_premium
+        report.total_issues = len(result.get("red_flags", []))
+        return report
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Employment contract analysis failed: {str(e)}")
@@ -3160,6 +3780,11 @@ class FreelancerContractReport(BaseModel):
     missing_protections: list[str]
     summary: str
     suggested_changes: str
+
+    # Premium access metadata
+    document_hash: Optional[str] = None
+    is_premium: bool = False
+    total_issues: Optional[int] = None
 
 
 def mock_freelancer_analysis(contract_text: str, project_value: int = None) -> dict:
@@ -3332,13 +3957,24 @@ def mock_freelancer_analysis(contract_text: str, project_value: int = None) -> d
 
 
 @app.post("/api/analyze-freelancer", response_model=FreelancerContractReport)
-async def analyze_freelancer_contract(input: FreelancerContractInput):
+async def analyze_freelancer_contract(input: FreelancerContractInput, request: Request):
     """Analyze a freelancer/contractor agreement"""
     try:
+        # Compute document hash and check premium access
+        doc_hash = hash_document(input.contract_text)
+        user = get_current_user(request)
+        is_premium = False
+        if user:
+            is_premium = check_premium_access(user.id, doc_hash)
+
         if MOCK_MODE:
             result = mock_freelancer_analysis(input.contract_text, input.project_value)
             save_upload("freelancer", input.contract_text, None, result)
-            return FreelancerContractReport(**result)
+            report = FreelancerContractReport(**result)
+            report.document_hash = doc_hash
+            report.is_premium = is_premium
+            report.total_issues = len(result.get("red_flags", [])) + len(result.get("missing_protections", []))
+            return report
 
         client = get_client()
 
@@ -3389,7 +4025,12 @@ Return ONLY valid JSON."""
 
         result = json.loads(response_text.strip())
         save_upload("freelancer", input.contract_text, None, result)
-        return FreelancerContractReport(**result)
+
+        report = FreelancerContractReport(**result)
+        report.document_hash = doc_hash
+        report.is_premium = is_premium
+        report.total_issues = len(result.get("red_flags", [])) + len(result.get("missing_protections", []))
+        return report
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Freelancer contract analysis failed: {str(e)}")
@@ -3422,6 +4063,11 @@ class InfluencerContractReport(BaseModel):
     red_flags: list[InfluencerRedFlag]
     summary: str
     negotiation_script: str
+
+    # Premium access metadata
+    document_hash: Optional[str] = None
+    is_premium: bool = False
+    total_issues: Optional[int] = None
 
 
 def mock_influencer_analysis(contract_text: str, base_rate: int = None) -> dict:
@@ -3625,13 +4271,24 @@ the specific use case and negotiate appropriate compensation."
 
 
 @app.post("/api/analyze-influencer", response_model=InfluencerContractReport)
-async def analyze_influencer_contract(input: InfluencerContractInput):
+async def analyze_influencer_contract(input: InfluencerContractInput, request: Request):
     """Analyze an influencer/sponsorship contract"""
     try:
+        # Compute document hash and check premium access
+        doc_hash = hash_document(input.contract_text)
+        user = get_current_user(request)
+        is_premium = False
+        if user:
+            is_premium = check_premium_access(user.id, doc_hash)
+
         if MOCK_MODE:
             result = mock_influencer_analysis(input.contract_text, input.base_rate)
             save_upload("influencer", input.contract_text, None, result)
-            return InfluencerContractReport(**result)
+            report = InfluencerContractReport(**result)
+            report.document_hash = doc_hash
+            report.is_premium = is_premium
+            report.total_issues = len(result.get("red_flags", []))
+            return report
 
         client = get_client()
 
@@ -3684,7 +4341,12 @@ Return ONLY valid JSON."""
 
         result = json.loads(response_text.strip())
         save_upload("influencer", input.contract_text, None, result)
-        return InfluencerContractReport(**result)
+
+        report = InfluencerContractReport(**result)
+        report.document_hash = doc_hash
+        report.is_premium = is_premium
+        report.total_issues = len(result.get("red_flags", []))
+        return report
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Influencer contract analysis failed: {str(e)}")
@@ -3717,6 +4379,11 @@ class TimeshareContractReport(BaseModel):
     exit_options: list[str]
     summary: str
     rescission_letter: str
+
+    # Premium access metadata
+    document_hash: Optional[str] = None
+    is_premium: bool = False
+    total_issues: Optional[int] = None
 
 
 # State rescission periods
@@ -3908,9 +4575,16 @@ KEEP THE CERTIFIED MAIL RECEIPT - THIS IS YOUR PROOF"""
 
 
 @app.post("/api/analyze-timeshare", response_model=TimeshareContractReport)
-async def analyze_timeshare_contract(input: TimeshareContractInput):
+async def analyze_timeshare_contract(input: TimeshareContractInput, request: Request):
     """Analyze a timeshare contract"""
     try:
+        # Compute document hash and check premium access
+        doc_hash = hash_document(input.contract_text)
+        user = get_current_user(request)
+        is_premium = False
+        if user:
+            is_premium = check_premium_access(user.id, doc_hash)
+
         if MOCK_MODE:
             result = mock_timeshare_analysis(
                 input.contract_text,
@@ -3919,7 +4593,11 @@ async def analyze_timeshare_contract(input: TimeshareContractInput):
                 input.annual_fee
             )
             save_upload("timeshare", input.contract_text, input.state, result)
-            return TimeshareContractReport(**result)
+            report = TimeshareContractReport(**result)
+            report.document_hash = doc_hash
+            report.is_premium = is_premium
+            report.total_issues = len(result.get("red_flags", []))
+            return report
 
         client = get_client()
 
@@ -3975,7 +4653,12 @@ Return ONLY valid JSON."""
 
         result = json.loads(response_text.strip())
         save_upload("timeshare", input.contract_text, input.state, result)
-        return TimeshareContractReport(**result)
+
+        report = TimeshareContractReport(**result)
+        report.document_hash = doc_hash
+        report.is_premium = is_premium
+        report.total_issues = len(result.get("red_flags", []))
+        return report
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Timeshare contract analysis failed: {str(e)}")
@@ -4008,6 +4691,11 @@ class InsurancePolicyReport(BaseModel):
     coverage_gaps: list[str]
     summary: str
     questions_for_agent: str
+
+    # Premium access metadata
+    document_hash: Optional[str] = None
+    is_premium: bool = False
+    total_issues: Optional[int] = None
 
 
 def mock_insurance_policy_analysis(policy_text: str, policy_type: str = None, state: str = None) -> dict:
@@ -4176,13 +4864,24 @@ AFTER A LOSS:
 
 
 @app.post("/api/analyze-insurance-policy", response_model=InsurancePolicyReport)
-async def analyze_insurance_policy(input: InsurancePolicyInput):
+async def analyze_insurance_policy(input: InsurancePolicyInput, request: Request):
     """Analyze a consumer insurance policy"""
     try:
+        # Compute document hash and check premium access
+        doc_hash = hash_document(input.policy_text)
+        user = get_current_user(request)
+        is_premium = False
+        if user:
+            is_premium = check_premium_access(user.id, doc_hash)
+
         if MOCK_MODE:
             result = mock_insurance_policy_analysis(input.policy_text, input.policy_type, input.state)
             save_upload("insurance_policy", input.policy_text, input.state, result)
-            return InsurancePolicyReport(**result)
+            report = InsurancePolicyReport(**result)
+            report.document_hash = doc_hash
+            report.is_premium = is_premium
+            report.total_issues = len(result.get("red_flags", [])) + len(result.get("coverage_gaps", []))
+            return report
 
         client = get_client()
 
@@ -4233,7 +4932,12 @@ Return ONLY valid JSON."""
 
         result = json.loads(response_text.strip())
         save_upload("insurance_policy", input.policy_text, input.state, result)
-        return InsurancePolicyReport(**result)
+
+        report = InsurancePolicyReport(**result)
+        report.document_hash = doc_hash
+        report.is_premium = is_premium
+        report.total_issues = len(result.get("red_flags", [])) + len(result.get("coverage_gaps", []))
+        return report
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Insurance policy analysis failed: {str(e)}")

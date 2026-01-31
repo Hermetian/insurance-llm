@@ -1305,3 +1305,397 @@ body {
   color: var(--pixel-red);
   text-transform: uppercase;
 }
+
+/* ============== AUTH SECTION ============== */
+
+.header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.auth-section {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.user-email {
+  font-family: 'VT323', monospace;
+  font-size: 16px;
+  color: var(--pixel-text);
+}
+
+.credits-badge {
+  font-family: 'Press Start 2P', cursive;
+  font-size: 8px;
+  padding: 4px 8px;
+  background: var(--pixel-green);
+  color: #fff;
+  border: 2px solid var(--pixel-border);
+}
+
+.auth-btn {
+  font-family: 'Press Start 2P', cursive;
+  font-size: 8px;
+  padding: 8px 12px;
+  border: 2px solid var(--pixel-border);
+  cursor: pointer;
+  transition: all 0.1s;
+}
+
+.auth-btn:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 2px 2px 0 var(--pixel-shadow);
+}
+
+.login-btn {
+  background: var(--pixel-bg);
+  color: var(--pixel-text);
+}
+
+.signup-btn {
+  background: var(--pixel-accent-2);
+  color: #fff;
+}
+
+.logout-btn {
+  background: var(--pixel-bg);
+  color: var(--pixel-text);
+}
+
+/* ============== LOADING OVERLAY ============== */
+
+.loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.loading-content {
+  text-align: center;
+  color: #fff;
+  max-width: 500px;
+  padding: 32px;
+}
+
+.loading-spinner {
+  width: 60px;
+  height: 60px;
+  margin: 0 auto 24px;
+  position: relative;
+}
+
+.spinner-pixel {
+  width: 100%;
+  height: 100%;
+  border: 4px solid rgba(255, 255, 255, 0.2);
+  border-top-color: var(--pixel-accent-2);
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.loading-title {
+  font-family: 'Press Start 2P', cursive;
+  font-size: 14px;
+  margin-bottom: 12px;
+  color: var(--pixel-accent-2);
+}
+
+.loading-subtitle {
+  font-family: 'VT323', monospace;
+  font-size: 20px;
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 32px;
+}
+
+/* ============== AFFILIATE CARD ============== */
+
+.affiliate-card {
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  border: 3px solid var(--pixel-accent-2);
+  padding: 24px;
+  text-align: left;
+  max-width: 400px;
+  margin: 0 auto;
+  position: relative;
+}
+
+.affiliate-badge {
+  position: absolute;
+  top: -12px;
+  left: 16px;
+  font-family: 'Press Start 2P', cursive;
+  font-size: 8px;
+  padding: 4px 8px;
+  background: var(--pixel-yellow);
+  color: #000;
+}
+
+.affiliate-name {
+  font-family: 'Press Start 2P', cursive;
+  font-size: 12px;
+  color: #fff;
+  margin-bottom: 8px;
+}
+
+.affiliate-tagline {
+  font-family: 'VT323', monospace;
+  font-size: 22px;
+  color: var(--pixel-accent-2);
+  margin-bottom: 12px;
+}
+
+.affiliate-description {
+  font-family: 'VT323', monospace;
+  font-size: 18px;
+  color: rgba(255, 255, 255, 0.8);
+  margin-bottom: 16px;
+}
+
+.affiliate-cta {
+  display: inline-block;
+  font-family: 'Press Start 2P', cursive;
+  font-size: 10px;
+  padding: 12px 20px;
+  background: var(--pixel-accent-2);
+  color: #fff;
+  text-decoration: none;
+  border: none;
+  cursor: pointer;
+  transition: all 0.1s;
+}
+
+.affiliate-cta:hover {
+  background: #5de0d5;
+  transform: translate(-2px, -2px);
+  box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.5);
+}
+
+/* ============== AUTH MODAL ============== */
+
+.auth-modal {
+  max-width: 400px;
+}
+
+.auth-benefit {
+  font-size: 18px;
+  color: var(--pixel-text);
+  margin-bottom: 20px;
+}
+
+.auth-error {
+  font-family: 'Press Start 2P', cursive;
+  font-size: 8px;
+  color: var(--pixel-red);
+  background: rgba(255, 107, 107, 0.1);
+  border: 2px solid var(--pixel-red);
+  padding: 12px;
+  margin-bottom: 16px;
+}
+
+.auth-modal .pixel-input {
+  width: 100%;
+  margin-bottom: 12px;
+}
+
+.auth-switch {
+  font-size: 16px;
+  color: var(--pixel-gray);
+  margin-top: 16px;
+  text-align: center;
+}
+
+.link-btn {
+  background: none;
+  border: none;
+  color: var(--pixel-accent-2);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: inherit;
+  text-decoration: underline;
+  padding: 0;
+}
+
+.link-btn:hover {
+  color: var(--pixel-accent);
+}
+
+/* ============== PREMIUM UPSELL BANNER ============== */
+
+.premium-upsell-banner {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(135deg, #2d2d2d 0%, #1a1a1a 100%);
+  border-top: 4px solid var(--pixel-yellow);
+  padding: 16px 24px;
+  z-index: 900;
+}
+
+.upsell-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.upsell-icon {
+  font-family: 'Press Start 2P', cursive;
+  font-size: 14px;
+  color: var(--pixel-yellow);
+}
+
+.upsell-text {
+  flex: 1;
+  min-width: 200px;
+  font-family: 'VT323', monospace;
+  font-size: 18px;
+  color: #fff;
+}
+
+.upsell-text strong {
+  color: var(--pixel-yellow);
+}
+
+.unlock-btn {
+  background: var(--pixel-yellow) !important;
+  color: #000 !important;
+}
+
+.unlock-btn:hover {
+  background: #ffe066 !important;
+}
+
+/* ============== PREMIUM CONTENT BLUR ============== */
+
+.premium-blur {
+  filter: blur(4px);
+  pointer-events: none;
+  user-select: none;
+}
+
+.premium-locked-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.premium-locked-badge {
+  font-family: 'Press Start 2P', cursive;
+  font-size: 12px;
+  padding: 16px 24px;
+  background: var(--pixel-yellow);
+  color: #000;
+  transform: rotate(-3deg);
+}
+
+/* ============== SUMMARY VIEW ============== */
+
+.summary-section {
+  background: var(--pixel-bg-dark);
+  border: 3px solid var(--pixel-border);
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.summary-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.summary-title {
+  font-family: 'Press Start 2P', cursive;
+  font-size: 10px;
+  color: var(--pixel-text);
+}
+
+.summary-badge {
+  font-family: 'Press Start 2P', cursive;
+  font-size: 8px;
+  padding: 4px 8px;
+  background: var(--pixel-gray);
+  color: #fff;
+}
+
+.summary-badge.free {
+  background: var(--pixel-gray);
+}
+
+.summary-badge.premium {
+  background: var(--pixel-green);
+}
+
+.top-issues {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.top-issues li {
+  padding: 12px;
+  background: var(--pixel-bg);
+  border: 2px solid var(--pixel-border);
+  margin-bottom: 8px;
+  font-family: 'VT323', monospace;
+  font-size: 18px;
+}
+
+.more-issues-teaser {
+  font-family: 'Press Start 2P', cursive;
+  font-size: 10px;
+  color: var(--pixel-yellow);
+  text-align: center;
+  padding: 16px;
+  background: rgba(255, 217, 61, 0.1);
+  border: 2px dashed var(--pixel-yellow);
+  margin-top: 16px;
+}
+
+@media (max-width: 768px) {
+  .header-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .auth-section {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .upsell-content {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .upsell-text {
+    text-align: center;
+  }
+
+  .affiliate-card {
+    margin: 0 16px;
+  }
+}

@@ -1,6 +1,8 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useDropzone } from 'react-dropzone'
 import './App.css'
+import { getOffersForDocType } from './config/affiliates'
+import type { AffiliateOffer } from './config/affiliates'
 
 // API base URL - uses environment variable in production, localhost in dev
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8081'
@@ -320,6 +322,225 @@ function App() {
   const [disclaimerAccepted, setDisclaimerAccepted] = useState(false)
   const [pendingAnalysis, setPendingAnalysis] = useState<'coi' | 'lease' | 'gym' | 'employment' | 'freelancer' | 'influencer' | 'timeshare' | 'insurance_policy' | null>(null)
 
+  // Auth state
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [userEmail, setUserEmail] = useState<string | null>(null)
+  const [userCredits, setUserCredits] = useState(0)
+  const [authToken, setAuthToken] = useState<string | null>(() => localStorage.getItem('auth_token'))
+  const [showAuthModal, setShowAuthModal] = useState(false)
+  const [authMode, setAuthMode] = useState<'login' | 'signup'>('signup')
+  const [authEmail, setAuthEmail] = useState('')
+  const [authPassword, setAuthPassword] = useState('')
+  const [authError, setAuthError] = useState<string | null>(null)
+  const [authLoading, setAuthLoading] = useState(false)
+
+  // Premium/payment state
+  const [currentDocumentHash, setCurrentDocumentHash] = useState<string | null>(null)
+  const [isPremiumUnlocked, setIsPremiumUnlocked] = useState(false)
+  const [showPremiumUpsell, setShowPremiumUpsell] = useState(false)
+
+  // Affiliate offer state
+  const [currentOffer, setCurrentOffer] = useState<AffiliateOffer | null>(null)
+  const [, setOfferIndex] = useState(0)
+
+  // Check auth status on mount
+  useEffect(() => {
+    const checkAuth = async () => {
+      if (!authToken) return
+
+      try {
+        const res = await fetch(`${API_BASE}/api/auth/me`, {
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        })
+        const data = await res.json()
+        if (data.authenticated) {
+          setIsLoggedIn(true)
+          setUserEmail(data.user.email)
+          setUserCredits(data.user.credits)
+        } else {
+          // Token invalid, clear it
+          localStorage.removeItem('auth_token')
+          setAuthToken(null)
+        }
+      } catch (err) {
+        console.error('Auth check failed:', err)
+      }
+    }
+    checkAuth()
+  }, [authToken])
+
+  // Rotate affiliate offers during loading
+  useEffect(() => {
+    if (!loading || !docType) return
+
+    const offers = getOffersForDocType(docType.document_type)
+    if (offers.length === 0) return
+
+    setCurrentOffer(offers[0])
+    setOfferIndex(0)
+
+    const interval = setInterval(() => {
+      setOfferIndex(prev => {
+        const next = (prev + 1) % offers.length
+        setCurrentOffer(offers[next])
+        return next
+      })
+    }, 5000)
+
+    return () => clearInterval(interval)
+  }, [loading, docType])
+
+  // Auth functions
+  const handleSignup = async () => {
+    setAuthError(null)
+    setAuthLoading(true)
+
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/signup`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: authEmail, password: authPassword })
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        throw new Error(data.detail || 'Signup failed')
+      }
+
+      // Save token and update state
+      localStorage.setItem('auth_token', data.token)
+      setAuthToken(data.token)
+      setIsLoggedIn(true)
+      setUserEmail(data.user.email)
+      setUserCredits(data.user.credits)
+      setShowAuthModal(false)
+      setAuthEmail('')
+      setAuthPassword('')
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Signup failed'
+      setAuthError(errorMessage)
+    } finally {
+      setAuthLoading(false)
+    }
+  }
+
+  const handleLogin = async () => {
+    setAuthError(null)
+    setAuthLoading(true)
+
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: authEmail, password: authPassword })
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        throw new Error(data.detail || 'Login failed')
+      }
+
+      // Save token and update state
+      localStorage.setItem('auth_token', data.token)
+      setAuthToken(data.token)
+      setIsLoggedIn(true)
+      setUserEmail(data.user.email)
+      setUserCredits(data.user.credits)
+      setShowAuthModal(false)
+      setAuthEmail('')
+      setAuthPassword('')
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Login failed'
+      setAuthError(errorMessage)
+    } finally {
+      setAuthLoading(false)
+    }
+  }
+
+  const handleLogout = async () => {
+    try {
+      await fetch(`${API_BASE}/api/auth/logout`, {
+        method: 'POST',
+        headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {}
+      })
+    } catch (err) {
+      console.error('Logout error:', err)
+    }
+
+    localStorage.removeItem('auth_token')
+    setAuthToken(null)
+    setIsLoggedIn(false)
+    setUserEmail(null)
+    setUserCredits(0)
+  }
+
+  // Premium unlock functions
+  const handleUnlockReport = async () => {
+    if (!currentDocumentHash) return
+
+    if (!isLoggedIn) {
+      // Show auth modal first
+      setShowAuthModal(true)
+      return
+    }
+
+    if (userCredits > 0) {
+      // Use existing credit
+      try {
+        const res = await fetch(`${API_BASE}/api/unlock-report`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify({ document_hash: currentDocumentHash })
+        })
+
+        const data = await res.json()
+
+        if (res.ok) {
+          setIsPremiumUnlocked(true)
+          setUserCredits(data.credits)
+          setShowPremiumUpsell(false)
+        } else {
+          throw new Error(data.detail || 'Unlock failed')
+        }
+      } catch (err) {
+        console.error('Unlock error:', err)
+        alert('Failed to unlock report. Please try again.')
+      }
+    } else {
+      // Redirect to Stripe checkout
+      try {
+        const res = await fetch(`${API_BASE}/api/create-checkout-session`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify({
+            document_hash: currentDocumentHash,
+            success_url: window.location.href,
+            cancel_url: window.location.href
+          })
+        })
+
+        const data = await res.json()
+
+        if (res.ok && data.checkout_url) {
+          window.location.href = data.checkout_url
+        } else {
+          throw new Error(data.detail || 'Failed to create checkout')
+        }
+      } catch (err) {
+        console.error('Checkout error:', err)
+        alert('Failed to start checkout. Please try again.')
+      }
+    }
+  }
+
   const classifyDocument = async (text: string): Promise<ClassifyResult | null> => {
     setClassifying(true)
     try {
@@ -519,9 +740,14 @@ function App() {
     setComplianceReport(null)
 
     try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (authToken) {
+        headers['Authorization'] = `Bearer ${authToken}`
+      }
+
       const res = await fetch(`${API_BASE}/api/check-coi-compliance`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           coi_text: docText,
           project_type: projectType,
@@ -533,6 +759,15 @@ function App() {
       const data = await res.json()
       setComplianceReport(data)
       setComplianceTab('report')
+
+      // Handle premium metadata
+      if (data.document_hash) {
+        setCurrentDocumentHash(data.document_hash)
+        setIsPremiumUnlocked(data.is_premium || false)
+        if (!data.is_premium) {
+          setShowPremiumUpsell(true)
+        }
+      }
     } catch (err) {
       console.error(err)
       alert('Failed to check compliance. Make sure the backend is running!')
@@ -546,9 +781,14 @@ function App() {
     setLeaseReport(null)
 
     try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (authToken) {
+        headers['Authorization'] = `Bearer ${authToken}`
+      }
+
       const res = await fetch(`${API_BASE}/api/analyze-lease`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           lease_text: docText,
           state: selectedState || null,
@@ -560,6 +800,15 @@ function App() {
       const data = await res.json()
       setLeaseReport(data)
       setLeaseTab('report')
+
+      // Handle premium metadata
+      if (data.document_hash) {
+        setCurrentDocumentHash(data.document_hash)
+        setIsPremiumUnlocked(data.is_premium || false)
+        if (!data.is_premium) {
+          setShowPremiumUpsell(true)
+        }
+      }
     } catch (err) {
       console.error(err)
       alert('Failed to analyze lease. Make sure the backend is running!')
@@ -573,9 +822,14 @@ function App() {
     setGymReport(null)
 
     try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (authToken) {
+        headers['Authorization'] = `Bearer ${authToken}`
+      }
+
       const res = await fetch(`${API_BASE}/api/analyze-gym`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           contract_text: docText,
           state: selectedState || null
@@ -586,6 +840,15 @@ function App() {
       const data = await res.json()
       setGymReport(data)
       setGymTab('report')
+
+      // Handle premium metadata
+      if (data.document_hash) {
+        setCurrentDocumentHash(data.document_hash)
+        setIsPremiumUnlocked(data.is_premium || false)
+        if (!data.is_premium) {
+          setShowPremiumUpsell(true)
+        }
+      }
     } catch (err) {
       console.error(err)
       alert('Failed to analyze gym contract. Make sure the backend is running!')
@@ -599,9 +862,14 @@ function App() {
     setEmploymentReport(null)
 
     try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (authToken) {
+        headers['Authorization'] = `Bearer ${authToken}`
+      }
+
       const res = await fetch(`${API_BASE}/api/analyze-employment`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           contract_text: docText,
           state: selectedState || null
@@ -612,6 +880,15 @@ function App() {
       const data = await res.json()
       setEmploymentReport(data)
       setEmploymentTab('report')
+
+      // Handle premium metadata
+      if (data.document_hash) {
+        setCurrentDocumentHash(data.document_hash)
+        setIsPremiumUnlocked(data.is_premium || false)
+        if (!data.is_premium) {
+          setShowPremiumUpsell(true)
+        }
+      }
     } catch (err) {
       console.error(err)
       alert('Failed to analyze employment contract. Make sure the backend is running!')
@@ -625,9 +902,14 @@ function App() {
     setFreelancerReport(null)
 
     try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (authToken) {
+        headers['Authorization'] = `Bearer ${authToken}`
+      }
+
       const res = await fetch(`${API_BASE}/api/analyze-freelancer`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           contract_text: docText
         })
@@ -637,6 +919,15 @@ function App() {
       const data = await res.json()
       setFreelancerReport(data)
       setFreelancerTab('report')
+
+      // Handle premium metadata
+      if (data.document_hash) {
+        setCurrentDocumentHash(data.document_hash)
+        setIsPremiumUnlocked(data.is_premium || false)
+        if (!data.is_premium) {
+          setShowPremiumUpsell(true)
+        }
+      }
     } catch (err) {
       console.error(err)
       alert('Failed to analyze freelancer contract. Make sure the backend is running!')
@@ -650,9 +941,14 @@ function App() {
     setInfluencerReport(null)
 
     try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (authToken) {
+        headers['Authorization'] = `Bearer ${authToken}`
+      }
+
       const res = await fetch(`${API_BASE}/api/analyze-influencer`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           contract_text: docText
         })
@@ -662,6 +958,15 @@ function App() {
       const data = await res.json()
       setInfluencerReport(data)
       setInfluencerTab('report')
+
+      // Handle premium metadata
+      if (data.document_hash) {
+        setCurrentDocumentHash(data.document_hash)
+        setIsPremiumUnlocked(data.is_premium || false)
+        if (!data.is_premium) {
+          setShowPremiumUpsell(true)
+        }
+      }
     } catch (err) {
       console.error(err)
       alert('Failed to analyze influencer contract. Make sure the backend is running!')
@@ -675,9 +980,14 @@ function App() {
     setTimeshareReport(null)
 
     try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (authToken) {
+        headers['Authorization'] = `Bearer ${authToken}`
+      }
+
       const res = await fetch(`${API_BASE}/api/analyze-timeshare`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           contract_text: docText,
           state: selectedState || null
@@ -688,6 +998,15 @@ function App() {
       const data = await res.json()
       setTimeshareReport(data)
       setTimeshareTab('report')
+
+      // Handle premium metadata
+      if (data.document_hash) {
+        setCurrentDocumentHash(data.document_hash)
+        setIsPremiumUnlocked(data.is_premium || false)
+        if (!data.is_premium) {
+          setShowPremiumUpsell(true)
+        }
+      }
     } catch (err) {
       console.error(err)
       alert('Failed to analyze timeshare contract. Make sure the backend is running!')
@@ -701,9 +1020,14 @@ function App() {
     setInsurancePolicyReport(null)
 
     try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (authToken) {
+        headers['Authorization'] = `Bearer ${authToken}`
+      }
+
       const res = await fetch(`${API_BASE}/api/analyze-insurance-policy`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           policy_text: docText,
           state: selectedState || null
@@ -714,6 +1038,15 @@ function App() {
       const data = await res.json()
       setInsurancePolicyReport(data)
       setInsurancePolicyTab('report')
+
+      // Handle premium metadata
+      if (data.document_hash) {
+        setCurrentDocumentHash(data.document_hash)
+        setIsPremiumUnlocked(data.is_premium || false)
+        if (!data.is_premium) {
+          setShowPremiumUpsell(true)
+        }
+      }
     } catch (err) {
       console.error(err)
       alert('Failed to analyze insurance policy. Make sure the backend is running!')
@@ -757,6 +1090,11 @@ function App() {
     setDisclaimerAccepted(false)
     setDisclaimerInput('')
     setPendingAnalysis(null)
+    // Reset premium state
+    setCurrentDocumentHash(null)
+    setIsPremiumUnlocked(false)
+    setShowPremiumUpsell(false)
+    setCurrentOffer(null)
   }
 
   const getStatusColor = (status: string) => {
@@ -827,9 +1165,25 @@ function App() {
   return (
     <div className={`app ${scanLines ? 'scanlines' : ''}`}>
       <header className="header">
-        <div className="logo">
-          <span className="logo-icon">&#9043;</span>
-          <h1>Can They Fuck Me?</h1>
+        <div className="header-row">
+          <div className="logo">
+            <span className="logo-icon">&#9043;</span>
+            <h1>Can They Fuck Me?</h1>
+          </div>
+          <div className="auth-section">
+            {isLoggedIn ? (
+              <>
+                <span className="user-email">{userEmail}</span>
+                {userCredits > 0 && <span className="credits-badge">{userCredits} credits</span>}
+                <button className="auth-btn logout-btn" onClick={handleLogout}>Log Out</button>
+              </>
+            ) : (
+              <>
+                <button className="auth-btn login-btn" onClick={() => { setAuthMode('login'); setShowAuthModal(true) }}>Log In</button>
+                <button className="auth-btn signup-btn" onClick={() => { setAuthMode('signup'); setShowAuthModal(true) }}>Sign Up</button>
+              </>
+            )}
+          </div>
         </div>
         <p className="tagline">Upload your insurance policy, lease, or contract to see how it stacks up</p>
       </header>
@@ -2288,6 +2642,126 @@ function App() {
                 </>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Loading Overlay with Affiliate Offers */}
+      {loading && (
+        <div className="loading-overlay">
+          <div className="loading-content">
+            <div className="loading-spinner">
+              <div className="spinner-pixel"></div>
+            </div>
+            <h2 className="loading-title">ANALYZING YOUR DOCUMENT...</h2>
+            <p className="loading-subtitle">This usually takes 10-15 seconds</p>
+
+            {/* Affiliate Offer */}
+            {currentOffer && (
+              <div className="affiliate-card">
+                <div className="affiliate-badge">WHILE YOU WAIT</div>
+                <h3 className="affiliate-name">{currentOffer.name}</h3>
+                <p className="affiliate-tagline">{currentOffer.tagline}</p>
+                <p className="affiliate-description">{currentOffer.description}</p>
+                <a
+                  href={currentOffer.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="affiliate-cta"
+                  onClick={() => {
+                    // Track click (would be analytics in production)
+                    console.log('Affiliate click:', currentOffer.id)
+                  }}
+                >
+                  {currentOffer.cta} &rarr;
+                </a>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Auth Modal */}
+      {showAuthModal && (
+        <div className="modal-overlay" onClick={() => setShowAuthModal(false)}>
+          <div className="modal auth-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <span className="modal-icon">[*]</span>
+              <h2>{authMode === 'login' ? 'LOG IN' : 'SIGN UP'}</h2>
+            </div>
+            <div className="modal-content">
+              <p className="auth-benefit">
+                {authMode === 'signup'
+                  ? 'Create an account to unlock full reports and save your credits.'
+                  : 'Welcome back! Log in to access your account.'}
+              </p>
+
+              {authError && (
+                <div className="auth-error">{authError}</div>
+              )}
+
+              <input
+                type="email"
+                className="pixel-input"
+                placeholder="Email"
+                value={authEmail}
+                onChange={(e) => setAuthEmail(e.target.value)}
+                disabled={authLoading}
+              />
+              <input
+                type="password"
+                className="pixel-input"
+                placeholder="Password"
+                value={authPassword}
+                onChange={(e) => setAuthPassword(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && (authMode === 'login' ? handleLogin() : handleSignup())}
+                disabled={authLoading}
+              />
+
+              <div className="modal-buttons">
+                <button
+                  className="pixel-btn primary"
+                  onClick={authMode === 'login' ? handleLogin : handleSignup}
+                  disabled={authLoading || !authEmail || !authPassword}
+                >
+                  {authLoading ? '[...]' : authMode === 'login' ? '[LOG IN]' : '[SIGN UP]'}
+                </button>
+                <button className="pixel-btn secondary" onClick={() => setShowAuthModal(false)}>
+                  [CANCEL]
+                </button>
+              </div>
+
+              <p className="auth-switch">
+                {authMode === 'login' ? (
+                  <>Don't have an account? <button className="link-btn" onClick={() => setAuthMode('signup')}>Sign up</button></>
+                ) : (
+                  <>Already have an account? <button className="link-btn" onClick={() => setAuthMode('login')}>Log in</button></>
+                )}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Premium Upsell Modal */}
+      {showPremiumUpsell && !isPremiumUnlocked && (
+        <div className="premium-upsell-banner">
+          <div className="upsell-content">
+            <span className="upsell-icon">[LOCK]</span>
+            <div className="upsell-text">
+              <strong>You're seeing the summary.</strong>
+              {' '}Unlock the full report with all findings, detailed analysis, and letter templates.
+            </div>
+            <button className="pixel-btn primary unlock-btn" onClick={handleUnlockReport}>
+              {isLoggedIn
+                ? userCredits > 0
+                  ? `[USE 1 CREDIT] (${userCredits} left)`
+                  : '[UNLOCK - $3]'
+                : '[SIGN UP TO UNLOCK]'}
+            </button>
+            <button className="pixel-btn secondary" onClick={() => setShowPremiumUpsell(false)}>
+              [DISMISS]
+            </button>
           </div>
         </div>
       )}
