@@ -2,6 +2,27 @@
 
 ## Session Summaries
 
+### 2026-02-01 - Added Donation Link Infrastructure
+Set up donation link with easy configuration:
+
+**Files Created:**
+- `frontend/src/config/stripe.ts` - Config with `STRIPE_DONATION_LINK` and `DONATION_ENABLED` toggle
+- `MONETIZATION_SETUP.md` - Step-by-step guide for Stripe + affiliate setup
+
+**Changes Made:**
+- Footer now has donation link (hidden until enabled) and GitHub link
+- Added `footer-links` and `github-link` CSS styles
+- Donation link only shows when `DONATION_ENABLED = true`
+
+**To Enable Donations:**
+1. Create Stripe Payment Link at dashboard.stripe.com/payment-links
+2. Edit `frontend/src/config/stripe.ts`
+3. Replace `YOUR_LINK_HERE` with your link
+4. Set `DONATION_ENABLED = true`
+5. Rebuild and deploy
+
+---
+
 ### 2026-02-01 - Simplified to Free + Optional Auth for History
 Removed premium/paywall features. App is now completely free with optional sign-in.
 
