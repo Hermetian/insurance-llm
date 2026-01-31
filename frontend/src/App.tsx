@@ -2293,7 +2293,7 @@ function App() {
       )}
 
       <footer className="footer">
-        <p>* BROOKLYN NY *</p>
+        <p>* NOT LEGAL ADVICE *</p>
       </footer>
     </div>
   )
