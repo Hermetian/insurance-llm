@@ -2696,7 +2696,7 @@ function App() {
           )}
         </a>
         <a
-          href="https://github.com/discordwell/insurance-llm"
+          href="https://github.com/discordwell/cantheyfuckme"
           target="_blank"
           rel="noopener noreferrer"
           className="github-link-small"
