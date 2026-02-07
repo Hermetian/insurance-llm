@@ -20,7 +20,7 @@ export default function RedFlagList({ flags, protectionLabel = 'PROTECTION' }: R
   // Normalize legacy 'info' severity to 'minor'
   const normalized = flags.map(f => ({
     ...f,
-    severity: (f.severity === 'info' ? 'minor' : f.severity) as RedFlag['severity']
+    severity: ((f.severity as string) === 'info' ? 'minor' : f.severity) as RedFlag['severity']
   }))
 
   const dealbreakers = normalized.filter(rf => rf.severity === 'dealbreaker')
