@@ -65,7 +65,7 @@ const AI_LIMITED_STATES: Record<string, { mitigation: string[] }> = {
 }
 
 interface ClassifyResult {
-  document_type: 'coi' | 'lease' | 'gym' | 'timeshare' | 'influencer' | 'freelancer' | 'employment' | 'insurance_policy' | 'contract' | 'unknown'
+  document_type: 'coi' | 'lease' | 'gym' | 'timeshare' | 'influencer' | 'freelancer' | 'employment' | 'insurance_policy' | 'auto_purchase' | 'home_improvement' | 'nursing_home' | 'subscription' | 'debt_settlement' | 'contract' | 'unknown'
   confidence: number
   description: string
   supported: boolean
@@ -183,7 +183,7 @@ export default function InputSection({
             </div>
           )}
 
-          {['coi', 'lease', 'gym', 'employment', 'timeshare', 'insurance_policy'].includes(docType?.document_type || '') && (
+          {['coi', 'lease', 'gym', 'employment', 'timeshare', 'insurance_policy', 'auto_purchase', 'home_improvement', 'nursing_home', 'debt_settlement'].includes(docType?.document_type || '') && (
             <div className="option-group">
               <span className="label">STATE:</span>
               <select

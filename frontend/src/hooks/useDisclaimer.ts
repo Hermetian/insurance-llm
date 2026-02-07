@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-type AnalysisType = 'coi' | 'lease' | 'gym' | 'employment' | 'freelancer' | 'influencer' | 'timeshare' | 'insurance_policy'
+type AnalysisType = 'coi' | 'lease' | 'gym' | 'employment' | 'freelancer' | 'influencer' | 'timeshare' | 'insurance_policy' | 'auto_purchase' | 'home_improvement' | 'nursing_home' | 'subscription' | 'debt_settlement'
 
 interface UseDisclaimerOptions {
   runAnalysis: (docTypeStr: string | undefined) => Promise<void>

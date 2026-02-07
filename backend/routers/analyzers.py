@@ -13,6 +13,11 @@ from services.mock.freelancer import mock_freelancer_analysis
 from services.mock.influencer import mock_influencer_analysis
 from services.mock.timeshare import mock_timeshare_analysis
 from services.mock.insurance_policy import mock_insurance_policy_analysis
+from services.mock.auto_purchase import mock_auto_purchase_analysis
+from services.mock.home_improvement import mock_home_improvement_analysis
+from services.mock.nursing_home import mock_nursing_home_analysis
+from services.mock.subscription import mock_subscription_analysis
+from services.mock.debt_settlement import mock_debt_settlement_analysis
 
 from schemas.common import (
     COIComplianceInput, ComplianceReport,
@@ -24,6 +29,11 @@ from schemas.freelancer import FreelancerContractInput, FreelancerContractReport
 from schemas.influencer import InfluencerContractInput, InfluencerContractReport
 from schemas.timeshare import TimeshareContractInput, TimeshareContractReport
 from schemas.insurance_policy import InsurancePolicyInput, InsurancePolicyReport
+from schemas.auto_purchase import AutoPurchaseInput, AutoPurchaseReport
+from schemas.home_improvement import HomeImprovementInput, HomeImprovementReport
+from schemas.nursing_home import NursingHomeInput, NursingHomeReport
+from schemas.subscription import SubscriptionInput, SubscriptionReport
+from schemas.debt_settlement import DebtSettlementInput, DebtSettlementReport
 
 from prompts.coi import COI_EXTRACTION_PROMPT, COI_COMPLIANCE_PROMPT
 from prompts.lease import LEASE_EXTRACTION_PROMPT, LEASE_ANALYSIS_PROMPT
@@ -33,12 +43,19 @@ from prompts.freelancer import FREELANCER_ANALYSIS_PROMPT
 from prompts.influencer import INFLUENCER_ANALYSIS_PROMPT
 from prompts.timeshare import TIMESHARE_ANALYSIS_PROMPT
 from prompts.insurance_policy import INSURANCE_POLICY_ANALYSIS_PROMPT
+from prompts.auto_purchase import AUTO_PURCHASE_ANALYSIS_PROMPT
+from prompts.home_improvement import HOME_IMPROVEMENT_ANALYSIS_PROMPT
+from prompts.nursing_home import NURSING_HOME_ANALYSIS_PROMPT
+from prompts.subscription import SUBSCRIPTION_ANALYSIS_PROMPT
+from prompts.debt_settlement import DEBT_SETTLEMENT_ANALYSIS_PROMPT
 
 from data.project_types import PROJECT_TYPE_REQUIREMENTS
 from data.states import (
     STATE_GYM_PROTECTIONS,
     NON_COMPETE_STATES,
     TIMESHARE_RESCISSION,
+    STATE_DOC_FEE_CAPS,
+    STATE_DEBT_SOL,
 )
 from data.red_flags import LEASE_RED_FLAGS, GYM_RED_FLAGS, EMPLOYMENT_RED_FLAGS
 
@@ -577,3 +594,272 @@ async def analyze_insurance_policy(input: InsurancePolicyInput, request: Request
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Insurance policy analysis failed: {str(e)}")
+
+
+# ============== AUTO PURCHASE ANALYSIS ==============
+
+@router.post("/analyze-auto-purchase", response_model=AutoPurchaseReport)
+async def analyze_auto_purchase(input: AutoPurchaseInput, request: Request):
+    """Analyze a vehicle purchase contract"""
+    try:
+        doc_hash = hash_document(input.contract_text)
+        user = get_current_user(request)
+        is_premium = False
+        if user:
+            is_premium = check_premium_access(user.id, doc_hash)
+
+        if MOCK_MODE:
+            result = mock_auto_purchase_analysis(input.contract_text, input.state, input.vehicle_price, input.trade_in_value)
+            save_upload("auto_purchase", input.contract_text, input.state, result, user_id=user.id if user else None)
+            report = AutoPurchaseReport(**result)
+            report.document_hash = doc_hash
+            report.is_premium = is_premium
+            report.total_issues = len(result.get("red_flags", []))
+            return report
+
+        client = get_client()
+
+        prompt = AUTO_PURCHASE_ANALYSIS_PROMPT.format(
+            contract_text=input.contract_text[:15000],
+            state=input.state or "Not specified",
+            vehicle_price=f"${input.vehicle_price:,}" if input.vehicle_price else "Not specified",
+            trade_in_value=f"${input.trade_in_value:,}" if input.trade_in_value else "Not specified"
+        )
+
+        response = client.chat.completions.create(
+            model=OPENAI_MODEL,
+            max_completion_tokens=4096,
+            messages=[{"role": "user", "content": prompt}]
+        )
+
+        response_text = response.choices[0].message.content
+        if response_text.startswith("```"):
+            response_text = response_text.split("```")[1]
+            if response_text.startswith("json"):
+                response_text = response_text[4:]
+
+        result = json.loads(response_text.strip())
+        save_upload("auto_purchase", input.contract_text, input.state, result, user_id=user.id if user else None)
+
+        report = AutoPurchaseReport(**result)
+        report.document_hash = doc_hash
+        report.is_premium = is_premium
+        report.total_issues = len(result.get("red_flags", []))
+        return report
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Auto purchase analysis failed: {str(e)}")
+
+
+# ============== HOME IMPROVEMENT ANALYSIS ==============
+
+@router.post("/analyze-home-improvement", response_model=HomeImprovementReport)
+async def analyze_home_improvement(input: HomeImprovementInput, request: Request):
+    """Analyze a home improvement / contractor contract"""
+    try:
+        doc_hash = hash_document(input.contract_text)
+        user = get_current_user(request)
+        is_premium = False
+        if user:
+            is_premium = check_premium_access(user.id, doc_hash)
+
+        if MOCK_MODE:
+            result = mock_home_improvement_analysis(input.contract_text, input.state, input.project_cost)
+            save_upload("home_improvement", input.contract_text, input.state, result, user_id=user.id if user else None)
+            report = HomeImprovementReport(**result)
+            report.document_hash = doc_hash
+            report.is_premium = is_premium
+            report.total_issues = len(result.get("red_flags", [])) + len(result.get("missing_protections", []))
+            return report
+
+        client = get_client()
+
+        prompt = HOME_IMPROVEMENT_ANALYSIS_PROMPT.format(
+            contract_text=input.contract_text[:15000],
+            state=input.state or "Not specified",
+            project_cost=f"${input.project_cost:,}" if input.project_cost else "Not specified"
+        )
+
+        response = client.chat.completions.create(
+            model=OPENAI_MODEL,
+            max_completion_tokens=4096,
+            messages=[{"role": "user", "content": prompt}]
+        )
+
+        response_text = response.choices[0].message.content
+        if response_text.startswith("```"):
+            response_text = response_text.split("```")[1]
+            if response_text.startswith("json"):
+                response_text = response_text[4:]
+
+        result = json.loads(response_text.strip())
+        save_upload("home_improvement", input.contract_text, input.state, result, user_id=user.id if user else None)
+
+        report = HomeImprovementReport(**result)
+        report.document_hash = doc_hash
+        report.is_premium = is_premium
+        report.total_issues = len(result.get("red_flags", [])) + len(result.get("missing_protections", []))
+        return report
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Home improvement analysis failed: {str(e)}")
+
+
+# ============== NURSING HOME ANALYSIS ==============
+
+@router.post("/analyze-nursing-home", response_model=NursingHomeReport)
+async def analyze_nursing_home(input: NursingHomeInput, request: Request):
+    """Analyze a nursing home admission agreement"""
+    try:
+        doc_hash = hash_document(input.contract_text)
+        user = get_current_user(request)
+        is_premium = False
+        if user:
+            is_premium = check_premium_access(user.id, doc_hash)
+
+        if MOCK_MODE:
+            result = mock_nursing_home_analysis(input.contract_text, input.state)
+            save_upload("nursing_home", input.contract_text, input.state, result, user_id=user.id if user else None)
+            report = NursingHomeReport(**result)
+            report.document_hash = doc_hash
+            report.is_premium = is_premium
+            report.total_issues = len(result.get("red_flags", [])) + len(result.get("illegal_clauses", []))
+            return report
+
+        client = get_client()
+
+        prompt = NURSING_HOME_ANALYSIS_PROMPT.format(
+            contract_text=input.contract_text[:15000],
+            state=input.state or "Not specified"
+        )
+
+        response = client.chat.completions.create(
+            model=OPENAI_MODEL,
+            max_completion_tokens=4096,
+            messages=[{"role": "user", "content": prompt}]
+        )
+
+        response_text = response.choices[0].message.content
+        if response_text.startswith("```"):
+            response_text = response_text.split("```")[1]
+            if response_text.startswith("json"):
+                response_text = response_text[4:]
+
+        result = json.loads(response_text.strip())
+        save_upload("nursing_home", input.contract_text, input.state, result, user_id=user.id if user else None)
+
+        report = NursingHomeReport(**result)
+        report.document_hash = doc_hash
+        report.is_premium = is_premium
+        report.total_issues = len(result.get("red_flags", [])) + len(result.get("illegal_clauses", []))
+        return report
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Nursing home analysis failed: {str(e)}")
+
+
+# ============== SUBSCRIPTION ANALYSIS ==============
+
+@router.post("/analyze-subscription", response_model=SubscriptionReport)
+async def analyze_subscription(input: SubscriptionInput, request: Request):
+    """Analyze a subscription or SaaS agreement"""
+    try:
+        doc_hash = hash_document(input.contract_text)
+        user = get_current_user(request)
+        is_premium = False
+        if user:
+            is_premium = check_premium_access(user.id, doc_hash)
+
+        if MOCK_MODE:
+            result = mock_subscription_analysis(input.contract_text, input.monthly_cost)
+            save_upload("subscription", input.contract_text, None, result, user_id=user.id if user else None)
+            report = SubscriptionReport(**result)
+            report.document_hash = doc_hash
+            report.is_premium = is_premium
+            report.total_issues = len(result.get("red_flags", [])) + len(result.get("dark_patterns", []))
+            return report
+
+        client = get_client()
+
+        prompt = SUBSCRIPTION_ANALYSIS_PROMPT.format(
+            contract_text=input.contract_text[:15000],
+            monthly_cost=f"${input.monthly_cost:,.2f}" if input.monthly_cost else "Not specified"
+        )
+
+        response = client.chat.completions.create(
+            model=OPENAI_MODEL,
+            max_completion_tokens=4096,
+            messages=[{"role": "user", "content": prompt}]
+        )
+
+        response_text = response.choices[0].message.content
+        if response_text.startswith("```"):
+            response_text = response_text.split("```")[1]
+            if response_text.startswith("json"):
+                response_text = response_text[4:]
+
+        result = json.loads(response_text.strip())
+        save_upload("subscription", input.contract_text, None, result, user_id=user.id if user else None)
+
+        report = SubscriptionReport(**result)
+        report.document_hash = doc_hash
+        report.is_premium = is_premium
+        report.total_issues = len(result.get("red_flags", [])) + len(result.get("dark_patterns", []))
+        return report
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Subscription analysis failed: {str(e)}")
+
+
+# ============== DEBT SETTLEMENT ANALYSIS ==============
+
+@router.post("/analyze-debt-settlement", response_model=DebtSettlementReport)
+async def analyze_debt_settlement(input: DebtSettlementInput, request: Request):
+    """Analyze a debt settlement agreement"""
+    try:
+        doc_hash = hash_document(input.contract_text)
+        user = get_current_user(request)
+        is_premium = False
+        if user:
+            is_premium = check_premium_access(user.id, doc_hash)
+
+        if MOCK_MODE:
+            result = mock_debt_settlement_analysis(input.contract_text, input.state, input.debt_amount)
+            save_upload("debt_settlement", input.contract_text, input.state, result, user_id=user.id if user else None)
+            report = DebtSettlementReport(**result)
+            report.document_hash = doc_hash
+            report.is_premium = is_premium
+            report.total_issues = len(result.get("red_flags", [])) + len(result.get("missing_protections", []))
+            return report
+
+        client = get_client()
+
+        prompt = DEBT_SETTLEMENT_ANALYSIS_PROMPT.format(
+            contract_text=input.contract_text[:15000],
+            state=input.state or "Not specified",
+            debt_amount=f"${input.debt_amount:,}" if input.debt_amount else "Not specified"
+        )
+
+        response = client.chat.completions.create(
+            model=OPENAI_MODEL,
+            max_completion_tokens=4096,
+            messages=[{"role": "user", "content": prompt}]
+        )
+
+        response_text = response.choices[0].message.content
+        if response_text.startswith("```"):
+            response_text = response_text.split("```")[1]
+            if response_text.startswith("json"):
+                response_text = response_text[4:]
+
+        result = json.loads(response_text.strip())
+        save_upload("debt_settlement", input.contract_text, input.state, result, user_id=user.id if user else None)
+
+        report = DebtSettlementReport(**result)
+        report.document_hash = doc_hash
+        report.is_premium = is_premium
+        report.total_issues = len(result.get("red_flags", [])) + len(result.get("missing_protections", []))
+        return report
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Debt settlement analysis failed: {str(e)}")

@@ -106,3 +106,95 @@ export interface InsurancePolicyReport {
   summary: string
   questions_for_agent: string
 }
+
+// Red flag type using what_to_ask (used by auto purchase, home improvement, subscription, debt settlement)
+export interface ActionRedFlag {
+  name: string
+  severity: 'critical' | 'warning' | 'info'
+  clause_text?: string
+  explanation: string
+  what_to_ask: string
+}
+
+// Auto Purchase Contract Types
+export interface AutoPurchaseReport {
+  overall_risk: string
+  risk_score: number
+  dealer_name?: string
+  vehicle_description?: string
+  financing_type?: string
+  has_yoyo_financing: boolean
+  total_junk_fees?: string
+  red_flags: ActionRedFlag[]
+  state_protections: string[]
+  summary: string
+  demand_letter: string
+}
+
+// Home Improvement Contract Types
+export interface HomeImprovementReport {
+  overall_risk: string
+  risk_score: number
+  contractor_name?: string
+  project_type?: string
+  payment_structure?: string
+  has_lien_waiver: boolean
+  has_change_order_process: boolean
+  red_flags: ActionRedFlag[]
+  missing_protections: string[]
+  summary: string
+  protection_checklist: string
+}
+
+// Nursing Home Agreement Types
+export interface NursingHomeRedFlag {
+  name: string
+  severity: 'critical' | 'warning' | 'info'
+  clause_text?: string
+  explanation: string
+  what_to_ask: string
+}
+
+export interface NursingHomeReport {
+  overall_risk: string
+  risk_score: number
+  facility_name?: string
+  agreement_type?: string
+  has_responsible_party_clause: boolean
+  has_forced_arbitration: boolean
+  has_liability_waiver: boolean
+  red_flags: NursingHomeRedFlag[]
+  illegal_clauses: string[]
+  summary: string
+  rights_guide: string
+}
+
+// Subscription/SaaS Agreement Types
+export interface SubscriptionReport {
+  overall_risk: string
+  risk_score: number
+  service_name?: string
+  subscription_type?: string
+  has_auto_renewal: boolean
+  cancellation_difficulty: string
+  has_price_increase_clause: boolean
+  red_flags: ActionRedFlag[]
+  dark_patterns: string[]
+  summary: string
+  cancellation_guide: string
+}
+
+// Debt Settlement Agreement Types
+export interface DebtSettlementReport {
+  overall_risk: string
+  risk_score: number
+  company_name?: string
+  settlement_type?: string
+  has_paid_in_full: boolean
+  has_tax_warning: boolean
+  resets_statute_of_limitations: boolean
+  red_flags: ActionRedFlag[]
+  missing_protections: string[]
+  summary: string
+  settlement_letter: string
+}

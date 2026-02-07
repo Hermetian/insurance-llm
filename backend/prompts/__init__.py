@@ -8,6 +8,11 @@ from prompts.freelancer import FREELANCER_ANALYSIS_PROMPT
 from prompts.influencer import INFLUENCER_ANALYSIS_PROMPT
 from prompts.timeshare import TIMESHARE_ANALYSIS_PROMPT
 from prompts.insurance_policy import INSURANCE_POLICY_ANALYSIS_PROMPT
+from prompts.auto_purchase import AUTO_PURCHASE_ANALYSIS_PROMPT
+from prompts.home_improvement import HOME_IMPROVEMENT_ANALYSIS_PROMPT
+from prompts.nursing_home import NURSING_HOME_ANALYSIS_PROMPT
+from prompts.subscription import SUBSCRIPTION_ANALYSIS_PROMPT
+from prompts.debt_settlement import DEBT_SETTLEMENT_ANALYSIS_PROMPT
 from prompts.ocr import OCR_PROMPT
 
 __all__ = [
@@ -23,5 +28,10 @@ __all__ = [
     "INFLUENCER_ANALYSIS_PROMPT",
     "TIMESHARE_ANALYSIS_PROMPT",
     "INSURANCE_POLICY_ANALYSIS_PROMPT",
+    "AUTO_PURCHASE_ANALYSIS_PROMPT",
+    "HOME_IMPROVEMENT_ANALYSIS_PROMPT",
+    "NURSING_HOME_ANALYSIS_PROMPT",
+    "SUBSCRIPTION_ANALYSIS_PROMPT",
+    "DEBT_SETTLEMENT_ANALYSIS_PROMPT",
     "OCR_PROMPT",
 ]

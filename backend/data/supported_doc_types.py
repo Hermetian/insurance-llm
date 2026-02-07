@@ -40,6 +40,31 @@ SUPPORTED_DOC_TYPES = {
         "description": "Timeshare or vacation ownership agreement",
         "supported": True
     },
+    "auto_purchase": {
+        "name": "Auto Purchase Contract",
+        "description": "Vehicle purchase or financing agreement",
+        "supported": True
+    },
+    "home_improvement": {
+        "name": "Home Improvement Contract",
+        "description": "Contractor or home improvement agreement",
+        "supported": True
+    },
+    "nursing_home": {
+        "name": "Nursing Home Agreement",
+        "description": "Nursing home or assisted living admission agreement",
+        "supported": True
+    },
+    "subscription": {
+        "name": "Subscription Agreement",
+        "description": "Subscription, SaaS, or recurring service agreement",
+        "supported": True
+    },
+    "debt_settlement": {
+        "name": "Debt Settlement Agreement",
+        "description": "Debt settlement, collection, or payment agreement",
+        "supported": True
+    },
     "contract": {
         "name": "Contract",
         "description": "General contract or agreement",

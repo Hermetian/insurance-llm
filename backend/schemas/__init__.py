@@ -12,3 +12,8 @@ from schemas.freelancer import FreelancerRedFlag, FreelancerContractInput, Freel
 from schemas.influencer import InfluencerRedFlag, InfluencerContractInput, InfluencerContractReport
 from schemas.timeshare import TimeshareRedFlag, TimeshareContractInput, TimeshareContractReport
 from schemas.insurance_policy import InsurancePolicyRedFlag, InsurancePolicyInput, InsurancePolicyReport
+from schemas.auto_purchase import AutoPurchaseRedFlag, AutoPurchaseInput, AutoPurchaseReport
+from schemas.home_improvement import HomeImprovementRedFlag, HomeImprovementInput, HomeImprovementReport
+from schemas.nursing_home import NursingHomeRedFlag, NursingHomeInput, NursingHomeReport
+from schemas.subscription import SubscriptionRedFlag, SubscriptionInput, SubscriptionReport
+from schemas.debt_settlement import DebtSettlementRedFlag, DebtSettlementInput, DebtSettlementReport

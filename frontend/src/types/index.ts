@@ -22,4 +22,10 @@ export type {
   TimeshareContractReport,
   InsurancePolicyRedFlag,
   InsurancePolicyReport,
+  AutoPurchaseReport,
+  HomeImprovementReport,
+  NursingHomeRedFlag,
+  NursingHomeReport,
+  SubscriptionReport,
+  DebtSettlementReport,
 } from './contracts'

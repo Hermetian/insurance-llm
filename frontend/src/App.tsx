@@ -14,6 +14,11 @@ import type {
   InfluencerContractReport,
   TimeshareContractReport,
   InsurancePolicyReport,
+  AutoPurchaseReport,
+  HomeImprovementReport,
+  NursingHomeReport,
+  SubscriptionReport,
+  DebtSettlementReport,
 } from './types'
 
 // Hooks
@@ -41,6 +46,11 @@ import FreelancerReport from './components/reports/FreelancerReport'
 import InfluencerReport from './components/reports/InfluencerReport'
 import TimeshareReport from './components/reports/TimeshareReport'
 import InsurancePolicyReport_ from './components/reports/InsurancePolicyReport'
+import AutoPurchaseReport_ from './components/reports/AutoPurchaseReport'
+import HomeImprovementReport_ from './components/reports/HomeImprovementReport'
+import NursingHomeReport_ from './components/reports/NursingHomeReport'
+import SubscriptionReport_ from './components/reports/SubscriptionReport'
+import DebtSettlementReport_ from './components/reports/DebtSettlementReport'
 
 function App() {
   const [scanLines] = useState(true)
@@ -64,6 +74,11 @@ function App() {
   const influencer = useAnalyzer<InfluencerContractReport>(auth.authToken)
   const timeshare = useAnalyzer<TimeshareContractReport>(auth.authToken)
   const insurancePolicy = useAnalyzer<InsurancePolicyReport>(auth.authToken)
+  const autoPurchase = useAnalyzer<AutoPurchaseReport>(auth.authToken)
+  const homeImprovement = useAnalyzer<HomeImprovementReport>(auth.authToken)
+  const nursingHome = useAnalyzer<NursingHomeReport>(auth.authToken)
+  const subscription = useAnalyzer<SubscriptionReport>(auth.authToken)
+  const debtSettlement = useAnalyzer<DebtSettlementReport>(auth.authToken)
 
   const resetAllReports = () => {
     coi.reset()
@@ -74,6 +89,11 @@ function App() {
     influencer.reset()
     timeshare.reset()
     insurancePolicy.reset()
+    autoPurchase.reset()
+    homeImprovement.reset()
+    nursingHome.reset()
+    subscription.reset()
+    debtSettlement.reset()
   }
 
   // Document upload hook
@@ -81,7 +101,8 @@ function App() {
 
   // Combined loading state
   const anyLoading = coi.loading || lease.loading || gym.loading || employment.loading ||
-    freelancer.loading || influencer.loading || timeshare.loading || insurancePolicy.loading
+    freelancer.loading || influencer.loading || timeshare.loading || insurancePolicy.loading ||
+    autoPurchase.loading || homeImprovement.loading || nursingHome.loading || subscription.loading || debtSettlement.loading
 
   // Run the right analyzer based on doc type
   const runAnalysis = async (docTypeStr: string | undefined) => {
@@ -142,6 +163,41 @@ function App() {
           errorMessage: 'Insurance policy analysis failed.',
         })
         break
+      case 'auto_purchase':
+        await autoPurchase.analyze({
+          endpoint: '/api/analyze-auto-purchase',
+          buildBody: () => ({ contract_text: upload.docText, state: upload.selectedState || null }),
+          errorMessage: 'Auto purchase analysis failed.',
+        })
+        break
+      case 'home_improvement':
+        await homeImprovement.analyze({
+          endpoint: '/api/analyze-home-improvement',
+          buildBody: () => ({ contract_text: upload.docText, state: upload.selectedState || null }),
+          errorMessage: 'Home improvement analysis failed.',
+        })
+        break
+      case 'nursing_home':
+        await nursingHome.analyze({
+          endpoint: '/api/analyze-nursing-home',
+          buildBody: () => ({ contract_text: upload.docText, state: upload.selectedState || null }),
+          errorMessage: 'Nursing home analysis failed.',
+        })
+        break
+      case 'subscription':
+        await subscription.analyze({
+          endpoint: '/api/analyze-subscription',
+          buildBody: () => ({ contract_text: upload.docText }),
+          errorMessage: 'Subscription analysis failed.',
+        })
+        break
+      case 'debt_settlement':
+        await debtSettlement.analyze({
+          endpoint: '/api/analyze-debt-settlement',
+          buildBody: () => ({ contract_text: upload.docText, state: upload.selectedState || null }),
+          errorMessage: 'Debt settlement analysis failed.',
+        })
+        break
     }
   }
 
@@ -165,8 +221,8 @@ function App() {
     // If disclaimer not yet accepted, show the modal
     if (!disclaimer.disclaimerAccepted) {
       const docTypeStr = currentDocType?.document_type
-      if (docTypeStr && ['coi', 'lease', 'gym', 'employment', 'freelancer', 'influencer', 'timeshare', 'insurance_policy'].includes(docTypeStr)) {
-        disclaimer.setPendingAnalysis(docTypeStr as 'coi' | 'lease' | 'gym' | 'employment' | 'freelancer' | 'influencer' | 'timeshare' | 'insurance_policy')
+      if (docTypeStr && ['coi', 'lease', 'gym', 'employment', 'freelancer', 'influencer', 'timeshare', 'insurance_policy', 'auto_purchase', 'home_improvement', 'nursing_home', 'subscription', 'debt_settlement'].includes(docTypeStr)) {
+        disclaimer.setPendingAnalysis(docTypeStr as 'coi' | 'lease' | 'gym' | 'employment' | 'freelancer' | 'influencer' | 'timeshare' | 'insurance_policy' | 'auto_purchase' | 'home_improvement' | 'nursing_home' | 'subscription' | 'debt_settlement')
       }
       disclaimer.setShowDisclaimerModal(true)
       disclaimer.setDisclaimerInput('')
@@ -280,6 +336,11 @@ function App() {
         {influencer.report && <InfluencerReport report={influencer.report} tab={influencer.tab} setTab={influencer.setTab} />}
         {timeshare.report && <TimeshareReport report={timeshare.report} tab={timeshare.tab} setTab={timeshare.setTab} />}
         {insurancePolicy.report && <InsurancePolicyReport_ report={insurancePolicy.report} tab={insurancePolicy.tab} setTab={insurancePolicy.setTab} />}
+        {autoPurchase.report && <AutoPurchaseReport_ report={autoPurchase.report} tab={autoPurchase.tab} setTab={autoPurchase.setTab} />}
+        {homeImprovement.report && <HomeImprovementReport_ report={homeImprovement.report} tab={homeImprovement.tab} setTab={homeImprovement.setTab} />}
+        {nursingHome.report && <NursingHomeReport_ report={nursingHome.report} tab={nursingHome.tab} setTab={nursingHome.setTab} />}
+        {subscription.report && <SubscriptionReport_ report={subscription.report} tab={subscription.tab} setTab={subscription.setTab} />}
+        {debtSettlement.report && <DebtSettlementReport_ report={debtSettlement.report} tab={debtSettlement.tab} setTab={debtSettlement.setTab} />}
       </main>
 
       <DisclaimerModal

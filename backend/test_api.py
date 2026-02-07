@@ -261,6 +261,134 @@ Disputes over value shall be resolved through binding appraisal.
 ANTI-CONCURRENT CAUSATION:
 This policy excludes loss caused directly or indirectly by any excluded peril, regardless of other contributing causes."""
 
+AUTO_PURCHASE_DOCUMENT = """RETAIL INSTALLMENT SALE CONTRACT - MOTOR VEHICLE
+
+Dealer: Premier Auto Group
+Buyer: Michael Chen
+Date: January 15, 2025
+
+VEHICLE INFORMATION:
+Year: 2025  Make: Toyota  Model: Camry XSE
+VIN: 4T1BZ1HK5LU123456
+MSRP: $32,500
+Dealer Markup / Market Adjustment: $3,500
+
+ITEMIZED CHARGES:
+Vehicle Price: $36,000
+Documentation Fee: $799
+Nitrogen Tire Fill: $399
+VIN Etching: $295
+Paint Protection: $695
+Fabric Protection: $295
+Gap Insurance: $895
+Extended Warranty: $2,495
+Trade-In Credit: -$8,000
+
+FINANCING:
+Total Amount Financed: $33,873
+APR: 8.9%
+Term: 72 months
+
+SPOT DELIVERY AGREEMENT:
+This sale is contingent upon financing approval. Dealer reserves the right to modify financing terms if the original terms are not approved by the lender. Buyer agrees to return the vehicle and sign new contract terms if financing is not approved as originally presented."""
+
+HOME_IMPROVEMENT_DOCUMENT = """HOME IMPROVEMENT CONTRACT
+
+Contractor: Bob's Renovation LLC
+Homeowner: Sarah Williams
+Project: Kitchen Renovation
+Date: February 1, 2025
+Project Cost: $45,000
+
+1. SCOPE OF WORK
+General kitchen renovation including cabinets, countertops, and flooring.
+
+2. PAYMENT SCHEDULE
+- 60% due at signing ($27,000)
+- 20% at midpoint ($9,000)
+- 20% at completion ($9,000)
+
+3. TIMELINE
+Work to begin within 30 days of signing. No specific completion date provided.
+
+4. CHANGES
+Any changes requested by homeowner will be billed at contractor's discretion.
+
+5. QUALITY ASSURANCE
+Contractor makes no assurances regarding materials or workmanship.
+
+6. DISPUTES
+All disputes shall be resolved through binding arbitration."""
+
+NURSING_HOME_DOCUMENT = """ADMISSION AGREEMENT - SUNRISE SENIOR CARE FACILITY
+
+Resident: Dorothy Johnson
+Responsible Party: Robert Johnson (son)
+
+1. RESPONSIBLE PARTY OBLIGATION
+The undersigned Responsible Party personally guarantees payment of all charges incurred by the Resident. Responsible Party agrees to be personally liable for any amounts not covered by Medicare, Medicaid, or insurance.
+
+2. ARBITRATION AGREEMENT
+Any and all disputes, including claims of negligence, abuse, wrongful death, or violations of rights, shall be resolved exclusively through binding arbitration. Resident and Responsible Party waive the right to a jury trial and to participate in class action lawsuits.
+
+3. LIABILITY WAIVER
+The Facility shall not be responsible for injuries, illness, or death resulting from the Resident's condition, falls, or interactions with other residents. Resident holds facility harmless.
+
+4. DISCHARGE
+Facility reserves the right to discharge Resident immediately if payment is not received within 5 business days of the due date.
+
+5. PERSONAL PROPERTY
+Facility is not responsible for loss, theft, or damage to any personal property.
+
+6. MEDICAL CONSENT
+Resident consents to any and all treatments deemed necessary by the facility medical staff."""
+
+SUBSCRIPTION_DOCUMENT = """TERMS OF SERVICE - CLOUDPRO BUSINESS SUITE
+
+Service: CloudPro Business Suite
+Plan: Enterprise Annual
+Monthly Cost: $299/month (billed annually at $3,588)
+
+1. AUTO-RENEWAL
+This subscription will automatically renew for successive one-year terms unless cancelled. Cancellation must be submitted in writing by certified mail at least 60 days before the renewal date.
+
+2. PRICE CHANGES
+CloudPro reserves the right to increase pricing at any time. Continued use after notification constitutes acceptance of new pricing.
+
+3. DATA AND EXPORT
+Upon cancellation, your data will be retained for 30 days before permanent deletion. Data export is available only on Enterprise Plus plans.
+
+4. FREE TRIAL
+Your 14-day free trial automatically converts to an annual subscription. By starting the trial, you authorize us to charge your payment method for the full annual amount.
+
+5. CANCELLATION
+To cancel, you must call our retention team at 1-800-555-CLOUD between 9am-5pm EST, Monday through Friday. Online cancellation is not available."""
+
+DEBT_SETTLEMENT_DOCUMENT = """DEBT SETTLEMENT AGREEMENT
+
+Creditor: National Credit Services LLC
+Debtor: James Wilson
+Original Debt Amount: $12,500
+Settlement Amount: $7,500
+
+1. PAYMENT TERMS
+Debtor agrees to pay $7,500 in three installments of $2,500 each, due on the 1st of each month beginning March 1, 2025.
+
+2. DEFAULT
+If any payment is more than 5 days late, this agreement is void and the full original balance of $12,500 plus accrued interest and collection fees becomes immediately due.
+
+3. SETTLEMENT STATUS
+Upon receipt of final payment, Creditor agrees to update the account status.
+
+4. FINANCIAL REPORTING
+(No disclosure regarding reporting obligations or potential income treatment is provided.)
+
+5. REMAINING BALANCE
+Creditor reserves the right to sell any remaining balance not covered by this settlement to a third-party collection agency.
+
+6. ACKNOWLEDGMENT
+By signing this agreement, Debtor acknowledges the validity of the full original debt amount and waives any statute of limitations defense."""
+
 COMMERCIAL_LEASE_DOCUMENT = """COMMERCIAL LEASE AGREEMENT
 
 Landlord: BigProperty Holdings LLC
@@ -333,6 +461,13 @@ class InsuranceLLMTester:
         self.test_influencer_analysis()
         self.test_timeshare_analysis()
         self.test_insurance_policy_analysis()
+
+        # New Contract Type Tests (Phase 2)
+        self.test_auto_purchase_analysis()
+        self.test_home_improvement_analysis()
+        self.test_nursing_home_analysis()
+        self.test_subscription_analysis()
+        self.test_debt_settlement_analysis()
 
         # Waitlist Tests
         self.test_waitlist_signup()
@@ -761,6 +896,199 @@ class InsuranceLLMTester:
             "Insurance Policy Analysis",
             passed,
             f"Failed checks: {failed}" if not passed else "Insurance policy analysis working correctly",
+            data
+        )
+
+    # ==================== NEW CONTRACT TYPE TESTS (PHASE 2) ====================
+
+    def test_auto_purchase_analysis(self):
+        """Test auto purchase contract analysis"""
+        status, data = self._make_request("POST", "/api/analyze-auto-purchase", {
+            "contract_text": AUTO_PURCHASE_DOCUMENT,
+            "state": "CA",
+            "vehicle_price": 36000,
+            "trade_in_value": 8000
+        })
+
+        if status == 0:
+            self._add_result("Auto Purchase Analysis", False, data.get("error", "Connection failed"))
+            return
+
+        checks = []
+        checks.append(("status_ok", status == 200))
+        checks.append(("has_overall_risk", "overall_risk" in data))
+        checks.append(("has_has_yoyo_financing", "has_yoyo_financing" in data))
+        checks.append(("has_red_flags", "red_flags" in data))
+        checks.append(("has_demand_letter", "demand_letter" in data))
+        checks.append(("has_state_protections", "state_protections" in data))
+
+        # Should detect yo-yo/spot delivery
+        checks.append(("detected_yoyo", data.get("has_yoyo_financing") == True))
+
+        # Should detect junk fees (nitrogen, VIN etching, etc.)
+        red_flags = data.get("red_flags", [])
+        has_junk_flag = any("fee" in str(rf).lower() or "nitrogen" in str(rf).lower() or "vin etch" in str(rf).lower() or "junk" in str(rf).lower() for rf in red_flags)
+        checks.append(("caught_junk_fees", has_junk_flag))
+
+        failed = [c[0] for c in checks if not c[1]]
+        passed = len(failed) == 0
+
+        self._add_result(
+            "Auto Purchase Analysis",
+            passed,
+            f"Failed checks: {failed}" if not passed else "Auto purchase analysis working correctly",
+            data
+        )
+
+    def test_home_improvement_analysis(self):
+        """Test home improvement contract analysis"""
+        status, data = self._make_request("POST", "/api/analyze-home-improvement", {
+            "contract_text": HOME_IMPROVEMENT_DOCUMENT,
+            "state": "NY",
+            "project_cost": 45000
+        })
+
+        if status == 0:
+            self._add_result("Home Improvement Analysis", False, data.get("error", "Connection failed"))
+            return
+
+        checks = []
+        checks.append(("status_ok", status == 200))
+        checks.append(("has_overall_risk", "overall_risk" in data))
+        checks.append(("has_red_flags", "red_flags" in data))
+        checks.append(("has_protection_checklist", "protection_checklist" in data))
+        checks.append(("has_missing_protections", "missing_protections" in data))
+
+        # Should detect front-loaded payments (60% upfront)
+        red_flags = data.get("red_flags", [])
+        has_payment_flag = any("payment" in str(rf).lower() or "upfront" in str(rf).lower() or "front" in str(rf).lower() for rf in red_flags)
+        checks.append(("caught_payment_issue", has_payment_flag))
+
+        # Should detect no warranty
+        has_warranty_flag = any("warranty" in str(rf).lower() for rf in red_flags)
+        checks.append(("caught_no_warranty", has_warranty_flag))
+
+        failed = [c[0] for c in checks if not c[1]]
+        passed = len(failed) == 0
+
+        self._add_result(
+            "Home Improvement Analysis",
+            passed,
+            f"Failed checks: {failed}" if not passed else "Home improvement analysis working correctly",
+            data
+        )
+
+    def test_nursing_home_analysis(self):
+        """Test nursing home agreement analysis"""
+        status, data = self._make_request("POST", "/api/analyze-nursing-home", {
+            "contract_text": NURSING_HOME_DOCUMENT,
+            "state": "FL"
+        })
+
+        if status == 0:
+            self._add_result("Nursing Home Analysis", False, data.get("error", "Connection failed"))
+            return
+
+        checks = []
+        checks.append(("status_ok", status == 200))
+        checks.append(("has_overall_risk", "overall_risk" in data))
+        checks.append(("has_red_flags", "red_flags" in data))
+        checks.append(("has_rights_guide", "rights_guide" in data))
+        checks.append(("has_illegal_clauses", "illegal_clauses" in data))
+
+        # Should detect responsible party clause (ILLEGAL)
+        checks.append(("detected_responsible_party", data.get("has_responsible_party_clause") == True))
+
+        # Should detect forced arbitration
+        checks.append(("detected_arbitration", data.get("has_forced_arbitration") == True))
+
+        # Should be high risk
+        checks.append(("high_risk", data.get("overall_risk") == "high"))
+
+        failed = [c[0] for c in checks if not c[1]]
+        passed = len(failed) == 0
+
+        self._add_result(
+            "Nursing Home Analysis",
+            passed,
+            f"Failed checks: {failed}" if not passed else "Nursing home analysis working correctly",
+            data
+        )
+
+    def test_subscription_analysis(self):
+        """Test subscription/SaaS agreement analysis"""
+        status, data = self._make_request("POST", "/api/analyze-subscription", {
+            "contract_text": SUBSCRIPTION_DOCUMENT,
+            "monthly_cost": 299
+        })
+
+        if status == 0:
+            self._add_result("Subscription Analysis", False, data.get("error", "Connection failed"))
+            return
+
+        checks = []
+        checks.append(("status_ok", status == 200))
+        checks.append(("has_overall_risk", "overall_risk" in data))
+        checks.append(("has_red_flags", "red_flags" in data))
+        checks.append(("has_cancellation_guide", "cancellation_guide" in data))
+        checks.append(("has_dark_patterns", "dark_patterns" in data))
+
+        # Should detect auto-renewal
+        checks.append(("detected_auto_renewal", data.get("has_auto_renewal") == True))
+
+        # Should detect price increase clause
+        checks.append(("detected_price_increase", data.get("has_price_increase_clause") == True))
+
+        # Should detect phone-only cancellation or difficult cancellation
+        red_flags = data.get("red_flags", [])
+        has_cancel_flag = any("cancel" in str(rf).lower() or "phone" in str(rf).lower() for rf in red_flags)
+        checks.append(("caught_cancel_difficulty", has_cancel_flag))
+
+        failed = [c[0] for c in checks if not c[1]]
+        passed = len(failed) == 0
+
+        self._add_result(
+            "Subscription Analysis",
+            passed,
+            f"Failed checks: {failed}" if not passed else "Subscription analysis working correctly",
+            data
+        )
+
+    def test_debt_settlement_analysis(self):
+        """Test debt settlement agreement analysis"""
+        status, data = self._make_request("POST", "/api/analyze-debt-settlement", {
+            "contract_text": DEBT_SETTLEMENT_DOCUMENT,
+            "state": "TX",
+            "debt_amount": 12500
+        })
+
+        if status == 0:
+            self._add_result("Debt Settlement Analysis", False, data.get("error", "Connection failed"))
+            return
+
+        checks = []
+        checks.append(("status_ok", status == 200))
+        checks.append(("has_overall_risk", "overall_risk" in data))
+        checks.append(("has_red_flags", "red_flags" in data))
+        checks.append(("has_settlement_letter", "settlement_letter" in data))
+        checks.append(("has_missing_protections", "missing_protections" in data))
+
+        # Should detect missing "paid in full" language
+        checks.append(("detected_no_paid_in_full", data.get("has_paid_in_full") == False))
+
+        # Should detect statute of limitations reset
+        checks.append(("detected_sol_reset", data.get("resets_statute_of_limitations") == True))
+
+        # Should detect missing tax warning
+        checks.append(("detected_no_tax_warning", data.get("has_tax_warning") == False))
+
+        failed = [c[0] for c in checks if not c[1]]
+        passed = len(failed) == 0
+
+        self._add_result(
+            "Debt Settlement Analysis",
+            passed,
+            f"Failed checks: {failed}" if not passed else "Debt settlement analysis working correctly",
             data
         )
 

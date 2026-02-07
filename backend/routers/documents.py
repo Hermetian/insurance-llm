@@ -284,6 +284,16 @@ async def classify_document(input: ClassifyInput):
                 doc_type = "employment_contract"
             elif 'policy' in text_lower and 'premium' in text_lower:
                 doc_type = "insurance_policy"
+            elif ('vehicle' in text_lower or 'dealer' in text_lower or 'vin' in text_lower) and ('purchase' in text_lower or 'financing' in text_lower or 'buyer' in text_lower):
+                doc_type = "auto_purchase"
+            elif ('contractor' in text_lower or 'renovation' in text_lower or 'remodel' in text_lower) and ('scope' in text_lower or 'completion' in text_lower or 'lien' in text_lower or 'home improvement' in text_lower):
+                doc_type = "home_improvement"
+            elif 'nursing' in text_lower or 'assisted living' in text_lower or ('admission' in text_lower and ('facility' in text_lower or 'resident' in text_lower)):
+                doc_type = "nursing_home"
+            elif 'subscription' in text_lower or 'auto-renew' in text_lower or ('recurring' in text_lower and 'billing' in text_lower) or 'saas' in text_lower:
+                doc_type = "subscription"
+            elif ('debt' in text_lower or 'settlement' in text_lower) and ('creditor' in text_lower or 'collection' in text_lower or 'paid in full' in text_lower or 'balance' in text_lower):
+                doc_type = "debt_settlement"
             elif 'agreement' in text_lower or 'contract' in text_lower:
                 doc_type = "contract"
             else:
