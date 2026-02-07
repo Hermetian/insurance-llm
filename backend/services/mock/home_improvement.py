@@ -115,6 +115,22 @@ def mock_home_improvement_analysis(contract_text: str, state: str = None, projec
         missing_protections.append("Proof of contractor license, GL insurance, and workers' comp")
         risk_score += 10
 
+    # Always add boilerplate
+    red_flags.append({
+        "name": "Standard Workmanship Warranty",
+        "severity": "boilerplate",
+        "clause_text": None,
+        "explanation": "The contract includes a standard workmanship warranty covering defects in labor. This is expected in any reputable home improvement contract.",
+        "what_to_ask": "No action needed - this is standard. Just note the warranty duration and what it covers."
+    })
+    red_flags.append({
+        "name": "Permit Responsibilities",
+        "severity": "boilerplate",
+        "clause_text": None,
+        "explanation": "The contract specifies who is responsible for pulling building permits. This is standard and important for code compliance.",
+        "what_to_ask": "No action needed - just verify the contractor (not you) is responsible for obtaining all required permits."
+    })
+
     # Cap risk score
     risk_score = min(100, risk_score)
 

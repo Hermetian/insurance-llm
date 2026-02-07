@@ -29,14 +29,19 @@ export const getStatusLabel = (status: string) => {
 
 export const getRiskColor = (risk: string) => {
   switch (risk) {
+    case 'dealbreaker':
+      return '#d32f2f'
     case 'high':
     case 'critical':
       return 'var(--pixel-red)'
     case 'medium':
     case 'warning':
       return 'var(--pixel-yellow)'
+    case 'minor':
+      return '#78909c'
     case 'low':
     case 'info':
+    case 'boilerplate':
       return 'var(--pixel-green)'
     default:
       return 'var(--pixel-gray)'
@@ -45,12 +50,18 @@ export const getRiskColor = (risk: string) => {
 
 export const getRiskLabel = (risk: string) => {
   switch (risk) {
+    case 'dealbreaker':
+      return 'DEALBREAKER'
     case 'high':
       return 'HIGH RISK'
     case 'medium':
       return 'MEDIUM RISK'
     case 'low':
       return 'LOW RISK'
+    case 'minor':
+      return 'MINOR'
+    case 'boilerplate':
+      return 'STANDARD'
     default:
       return risk.toUpperCase()
   }

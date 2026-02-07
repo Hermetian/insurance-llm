@@ -125,6 +125,22 @@ def mock_debt_settlement_analysis(contract_text: str, state: str = None, debt_am
         })
         risk_score += 10
 
+    # Always add boilerplate
+    red_flags.append({
+        "name": "Standard Authorization to Negotiate",
+        "severity": "boilerplate",
+        "clause_text": None,
+        "explanation": "The agreement authorizes the settlement company or attorney to negotiate with creditors on your behalf. This is standard in every debt settlement agreement and is necessary for them to act for you.",
+        "what_to_ask": "No action needed - this is standard. Just verify the scope of authority matches what you discussed."
+    })
+    red_flags.append({
+        "name": "Communication Preferences",
+        "severity": "boilerplate",
+        "clause_text": None,
+        "explanation": "The agreement includes your preferred communication methods and consent for contact. This is standard and required for the settlement process to work.",
+        "what_to_ask": "No action needed - this is standard. Just make sure your contact preferences are correct."
+    })
+
     # Cap risk score
     risk_score = min(100, risk_score)
 

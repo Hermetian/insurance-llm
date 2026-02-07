@@ -20,7 +20,7 @@ Return JSON:
     "resets_statute_of_limitations": true/false,
     "red_flags": [{{
         "name": "Issue",
-        "severity": "critical" | "warning" | "info",
+        "severity": "dealbreaker" | "critical" | "warning" | "minor" | "boilerplate",
         "clause_text": "Actual text from the agreement",
         "explanation": "What this means in plain language",
         "what_to_ask": "What to demand from the company"
@@ -31,4 +31,14 @@ Return JSON:
 }}
 
 Focus on missing paid-in-full or settled-in-full language, clauses that reset the statute of limitations on the debt, absence of tax disclosure (creditors must issue IRS Form 1099-C for forgiven debt over $600), upfront fees (illegal for debt settlement companies under the FTC Telemarketing Sales Rule), vague settlement terms, the creditor's right to sell remaining or forgiven debt, missing written confirmation requirements, and late payment default traps that void the settlement. Apply {state}-specific debt collection and settlement laws in addition to federal FDCPA protections.
+
+SEVERITY GUIDE:
+- "dealbreaker": Potentially illegal, voids purpose of agreement, or catastrophic irreversible harm. Consumer should NOT sign without legal counsel.
+- "critical": Will genuinely cost real money or real rights. Not theoretical - likely to actually bite. Negotiate before signing.
+- "warning": Could become a problem under certain circumstances. Unfavorable but not devastating. Worth negotiating if possible.
+- "minor": Low-impact, slightly outside the norm. Awareness only.
+- "boilerplate": Standard industry language in virtually every contract of this type. NOT a problem. Frame explanation reassuringly - explain what it means, not why it's dangerous. The consumer should NOT worry about these.
+
+Include at least 1-2 "boilerplate" items per analysis to reassure the user that not everything is bad.
+
 Return ONLY valid JSON."""

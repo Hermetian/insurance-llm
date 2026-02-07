@@ -68,7 +68,7 @@ def mock_timeshare_analysis(contract_text: str, state: str = None, purchase_pric
         rescission_deadline = f"{rescission_info['days']} {rescission_info['type']} days"
         red_flags.append({
             "name": f"Rescission Period: {rescission_deadline}",
-            "severity": "info",
+            "severity": "minor",
             "clause_text": None,
             "explanation": f"You have {rescission_info['days']} {rescission_info['type']} days to cancel and get your money back. After that, you're stuck.",
             "protection": "CANCEL NOW if you're having second thoughts. Send certified mail TODAY."
@@ -100,6 +100,22 @@ def mock_timeshare_analysis(contract_text: str, state: str = None, purchase_pric
             "protection": "Get ALL verbal promises in writing BEFORE signing. If they won't, assume they were lying."
         })
         risk_score += 10
+
+    # Always add boilerplate
+    red_flags.append({
+        "name": "Standard Occupancy Rules",
+        "severity": "boilerplate",
+        "clause_text": None,
+        "explanation": "The contract includes standard occupancy limits and guest policies. This is normal for any timeshare or vacation property agreement.",
+        "protection": "No action needed - this is standard property management language."
+    })
+    red_flags.append({
+        "name": "Governing Law Clause",
+        "severity": "boilerplate",
+        "clause_text": None,
+        "explanation": "The contract specifies which state's laws govern the agreement. This is standard boilerplate in every timeshare contract.",
+        "protection": "No action needed - this is standard and expected."
+    })
 
     # Generate exit options
     exit_options = []

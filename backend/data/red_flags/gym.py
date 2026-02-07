@@ -30,7 +30,7 @@ GYM_RED_FLAGS = {
     "annual_fee": {
         "name": "Hidden Annual Fee",
         "keywords": ["annual fee", "enhancement fee", "yearly fee", "maintenance fee"],
-        "severity": "warning",
+        "severity": "minor",
         "explanation": "Separate from monthly dues - often buried in the contract. Planet Fitness charges $49.99/year on top of monthly fees.",
         "protection": "Calculate total annual cost including all fees before signing."
     },
@@ -58,7 +58,7 @@ GYM_RED_FLAGS = {
     "personal_training_separate": {
         "name": "Personal Training is Separate",
         "keywords": ["personal training", "separate agreement", "pt contract"],
-        "severity": "info",
+        "severity": "minor",
         "explanation": "Canceling your membership does NOT cancel personal training. You could owe thousands.",
         "protection": "Review and cancel personal training separately. PT contracts often have stricter terms."
     }

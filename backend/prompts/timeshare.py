@@ -24,7 +24,7 @@ Return JSON:
     "estimated_10yr_cost": "$XX,XXX" with fee increases,
     "red_flags": [{{
         "name": "Issue",
-        "severity": "critical" | "warning" | "info",
+        "severity": "dealbreaker" | "critical" | "warning" | "minor" | "boilerplate",
         "clause_text": "Actual text",
         "explanation": "Plain language, direct impact",
         "protection": "What to do"
@@ -33,6 +33,15 @@ Return JSON:
     "summary": "2-3 sentences - be direct about the risks",
     "rescission_letter": "Template letter to cancel if within rescission period"
 }}
+
+SEVERITY GUIDE:
+- "dealbreaker": Potentially illegal, voids purpose of agreement, or catastrophic irreversible harm. Consumer should NOT sign without legal counsel.
+- "critical": Will genuinely cost real money or real rights. Not theoretical - likely to actually bite. Negotiate before signing.
+- "warning": Could become a problem under certain circumstances. Unfavorable but not devastating. Worth negotiating if possible.
+- "minor": Low-impact, slightly outside the norm. Awareness only.
+- "boilerplate": Standard industry language in virtually every contract of this type. NOT a problem. Frame explanation reassuringly - explain what it means, not why it's dangerous. The consumer should NOT worry about these.
+
+Include at least 1-2 "boilerplate" items per analysis to reassure the user that not everything is bad.
 
 Be blunt. 85% of timeshare buyers regret their purchase.
 Return ONLY valid JSON."""

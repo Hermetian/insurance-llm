@@ -107,7 +107,7 @@ def mock_subscription_analysis(contract_text: str, monthly_cost: int = None) -> 
     if 'overage' in text_lower or 'excess usage' in text_lower:
         red_flags.append({
             "name": "Overage Charges",
-            "severity": "info",
+            "severity": "minor",
             "clause_text": "Usage exceeding plan limits will be billed at the overage rate...",
             "explanation": "If you go over your plan limits, you get charged extra - sometimes at very high rates. This is common with cloud services, APIs, and data plans.",
             "what_to_ask": "Ask about overage rates and whether you can set usage alerts or hard caps. Some services will let you set a spending limit."
@@ -146,6 +146,22 @@ def mock_subscription_analysis(contract_text: str, monthly_cost: int = None) -> 
         cancellation_difficulty = "moderate"
     else:
         cancellation_difficulty = "easy"
+
+    # Always add boilerplate
+    red_flags.append({
+        "name": "Standard Terms of Service",
+        "severity": "boilerplate",
+        "clause_text": None,
+        "explanation": "The subscription includes standard terms of service covering acceptable use, account responsibilities, and service limitations. Every subscription service has these.",
+        "what_to_ask": "No action needed - this is standard. Just be aware of any usage restrictions that might affect you."
+    })
+    red_flags.append({
+        "name": "Privacy Policy Reference",
+        "severity": "boilerplate",
+        "clause_text": None,
+        "explanation": "The terms reference a separate privacy policy describing how your data is collected and used. This is legally required and standard for all online services.",
+        "what_to_ask": "No action needed - this is standard. Review the privacy policy if you're concerned about data collection."
+    })
 
     # Cap risk score
     risk_score = min(100, risk_score)

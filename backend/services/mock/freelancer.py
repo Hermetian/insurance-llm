@@ -96,6 +96,22 @@ def mock_freelancer_analysis(contract_text: str, project_value: int = None) -> d
     if 'portfolio' not in text_lower and 'display' not in text_lower:
         missing_protections.append("No portfolio rights mentioned")
 
+    # Always add boilerplate
+    red_flags.append({
+        "name": "Standard Payment Terms",
+        "severity": "boilerplate",
+        "clause_text": None,
+        "explanation": "The contract includes standard payment terms and invoicing procedures. This is normal in every freelancer agreement and establishes clear expectations.",
+        "protection": "No action needed - this is standard business practice."
+    })
+    red_flags.append({
+        "name": "Governing Law Clause",
+        "severity": "boilerplate",
+        "clause_text": None,
+        "explanation": "The contract specifies which state's laws govern disputes. This is standard boilerplate in every freelancer contract.",
+        "protection": "No action needed - this is standard and expected."
+    })
+
     # Determine contract type
     if 'statement of work' in text_lower or 'sow' in text_lower:
         contract_type = "sow"

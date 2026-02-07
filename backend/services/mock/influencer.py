@@ -129,6 +129,22 @@ def mock_influencer_analysis(contract_text: str, base_rate: int = None) -> dict:
             })
             risk_score += 10
 
+    # Always add boilerplate
+    red_flags.append({
+        "name": "Standard Content Approval Process",
+        "severity": "boilerplate",
+        "clause_text": None,
+        "explanation": "The brand requires approval of content before posting. This is standard in every influencer contract and ensures both parties are aligned on messaging.",
+        "protection": "No action needed - this is normal. Just clarify turnaround times for approvals."
+    })
+    red_flags.append({
+        "name": "Governing Law Clause",
+        "severity": "boilerplate",
+        "clause_text": None,
+        "explanation": "The contract specifies which state's laws govern the agreement. This is standard boilerplate found in every brand deal.",
+        "protection": "No action needed - this is standard and expected."
+    })
+
     # Determine campaign type
     if 'ambassador' in text_lower:
         campaign_type = "ambassador"

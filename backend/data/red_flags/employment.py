@@ -30,7 +30,7 @@ EMPLOYMENT_RED_FLAGS = {
     "no_moonlighting": {
         "name": "No Outside Work",
         "keywords": ["sole employer", "exclusive", "no other employment", "outside business"],
-        "severity": "info",
+        "severity": "minor",
         "explanation": "You may not be allowed to do freelance work or side projects.",
         "protection": "Negotiate explicit carve-outs for non-competing activities."
     },

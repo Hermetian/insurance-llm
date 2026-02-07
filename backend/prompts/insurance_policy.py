@@ -21,7 +21,7 @@ Return JSON:
     "has_arbitration": true/false,
     "red_flags": [{{
         "name": "Issue",
-        "severity": "critical" | "warning" | "info",
+        "severity": "dealbreaker" | "critical" | "warning" | "minor" | "boilerplate",
         "clause_text": "Actual policy text",
         "explanation": "What this means in plain language",
         "what_to_ask": "Question to ask your agent"
@@ -30,6 +30,15 @@ Return JSON:
     "summary": "2-3 sentences",
     "questions_for_agent": "Questions to ask your insurance agent"
 }}
+
+SEVERITY GUIDE:
+- "dealbreaker": Potentially illegal, voids purpose of agreement, or catastrophic irreversible harm. Consumer should NOT sign without legal counsel.
+- "critical": Will genuinely cost real money or real rights. Not theoretical - likely to actually bite. Negotiate before signing.
+- "warning": Could become a problem under certain circumstances. Unfavorable but not devastating. Worth negotiating if possible.
+- "minor": Low-impact, slightly outside the norm. Awareness only.
+- "boilerplate": Standard industry language in virtually every contract of this type. NOT a problem. Frame explanation reassuringly - explain what it means, not why it's dangerous. The consumer should NOT worry about these.
+
+Include at least 1-2 "boilerplate" items per analysis to reassure the user that not everything is bad.
 
 Focus on exclusions, deductibles, and valuation method.
 Return ONLY valid JSON."""

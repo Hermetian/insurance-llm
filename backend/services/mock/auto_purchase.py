@@ -102,7 +102,7 @@ def mock_auto_purchase_analysis(contract_text: str, state: str = None, vehicle_p
     if 'gap insurance' in text_lower or 'gap waiver' in text_lower:
         red_flags.append({
             "name": "GAP Insurance at Dealer",
-            "severity": "info",
+            "severity": "minor",
             "clause_text": "Guaranteed Asset Protection (GAP) coverage...",
             "explanation": "GAP insurance itself is useful if you owe more than the car is worth. But dealers mark it up 200-300%. Your regular insurer or credit union offers the same thing for $20-$50/year.",
             "what_to_ask": "Don't buy GAP from the dealer. Get it from your auto insurance company or credit union for a fraction of the cost."
@@ -119,6 +119,22 @@ def mock_auto_purchase_analysis(contract_text: str, state: str = None, vehicle_p
             "what_to_ask": "Ask to see the itemized breakdown. Decline all add-ons initially. If you want an extended warranty, shop third-party providers after purchase."
         })
         risk_score += 10
+
+    # Always add boilerplate
+    red_flags.append({
+        "name": "Standard Odometer Disclosure",
+        "severity": "boilerplate",
+        "clause_text": None,
+        "explanation": "Federal law requires odometer disclosure on all vehicle sales. This is completely standard and protects you as the buyer.",
+        "what_to_ask": "No action needed - this is a legal requirement that protects you."
+    })
+    red_flags.append({
+        "name": "Buyer's Order / Purchase Agreement",
+        "severity": "boilerplate",
+        "clause_text": None,
+        "explanation": "The standard buyer's order format listing vehicle details, price, and terms. Every dealership uses this.",
+        "what_to_ask": "No action needed - just verify the details match what you agreed to."
+    })
 
     # Cap risk score
     risk_score = min(100, risk_score)

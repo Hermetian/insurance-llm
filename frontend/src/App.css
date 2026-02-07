@@ -1838,3 +1838,84 @@ body {
   color: var(--pixel-text);
   text-decoration: underline;
 }
+
+/* ============== 5-TIER SEVERITY SYSTEM ============== */
+
+/* DEALBREAKER - Tier 1: Pulsing deep red */
+.data-card.dealbreaker {
+  border-color: #d32f2f;
+  background: #ffcdd2;
+  animation: dealbreaker-pulse 2s ease-in-out infinite;
+}
+
+@keyframes dealbreaker-pulse {
+  0%, 100% { box-shadow: 3px 3px 0 var(--pixel-shadow); }
+  50% { box-shadow: 3px 3px 0 var(--pixel-shadow), 0 0 20px rgba(211, 47, 47, 0.4); }
+}
+
+.data-card.dealbreaker h3 {
+  color: #d32f2f;
+}
+
+.compliance-item.dealbreaker {
+  border-left-color: #d32f2f;
+  background: rgba(211, 47, 47, 0.08);
+}
+
+.compliance-item.dealbreaker .status-icon {
+  color: #d32f2f;
+}
+
+/* MINOR - Tier 4: Subtle gray */
+.data-card.minor {
+  border-color: #78909c;
+  background: #f5f5f5;
+}
+
+.data-card.minor h3 {
+  color: #78909c;
+}
+
+.compliance-item.minor {
+  border-left-color: #78909c;
+}
+
+.compliance-item.minor .status-icon {
+  color: #78909c;
+}
+
+/* BOILERPLATE - Tier 5: Green, collapsible */
+.data-card.boilerplate {
+  border-color: var(--pixel-green);
+  background: #e8f5e9;
+}
+
+.data-card.boilerplate h3 {
+  color: var(--pixel-green);
+  cursor: pointer;
+  user-select: none;
+}
+
+.boilerplate-header {
+  display: flex;
+  align-items: center;
+}
+
+.boilerplate-header h3 {
+  flex: 1;
+  margin-bottom: 0;
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.compliance-item.boilerplate {
+  border-left-color: var(--pixel-green);
+}
+
+.compliance-item.boilerplate .status-icon {
+  color: var(--pixel-green);
+}
+
+.compliance-item.boilerplate .item-explanation {
+  color: #546e7a;
+}

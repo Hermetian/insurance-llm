@@ -110,12 +110,28 @@ def mock_nursing_home_analysis(contract_text: str, state: str = None) -> dict:
     if 'personal property' in text_lower and ('not responsible' in text_lower or 'disclaim' in text_lower):
         red_flags.append({
             "name": "Personal Property Disclaimer",
-            "severity": "info",
+            "severity": "minor",
             "clause_text": "Facility is not responsible for loss of personal property...",
             "explanation": "While facilities aren't usually liable for minor personal items, they have a duty to safeguard resident property and must maintain an inventory.",
             "what_to_ask": "Ask about their personal property inventory process. Label all items. Keep an inventory with photos. Don't bring valuables."
         })
         risk_score += 5
+
+    # Always add boilerplate
+    red_flags.append({
+        "name": "Standard HIPAA Notice",
+        "severity": "boilerplate",
+        "clause_text": None,
+        "explanation": "The agreement includes a HIPAA privacy notice explaining how the facility handles protected health information. This is federally required for all healthcare facilities.",
+        "what_to_ask": "No action needed - this is a federal requirement. Just review to understand your privacy rights."
+    })
+    red_flags.append({
+        "name": "Grievance Procedure",
+        "severity": "boilerplate",
+        "clause_text": None,
+        "explanation": "The agreement outlines a formal grievance process for complaints. Federal law requires every nursing facility to have this. It is standard and protects residents.",
+        "what_to_ask": "No action needed - this is required by law. Keep a copy so you know how to file a complaint if needed."
+    })
 
     # Cap risk score
     risk_score = min(100, risk_score)

@@ -104,6 +104,22 @@ def mock_insurance_policy_analysis(policy_text: str, policy_type: str = None, st
         if (policy_type == applies_to or applies_to == "all") and keyword in text_lower and 'exclud' in text_lower:
             coverage_gaps.append(f"{name} excluded - may need separate coverage")
 
+    # Always add boilerplate
+    red_flags.append({
+        "name": "Standard Claims Process",
+        "severity": "boilerplate",
+        "clause_text": None,
+        "explanation": "The policy outlines a standard claims filing process including notification deadlines and documentation requirements. This is required in every insurance policy by state regulators.",
+        "what_to_ask": "No action needed - just familiarize yourself with the deadlines and keep the claims number handy."
+    })
+    red_flags.append({
+        "name": "Subrogation Clause",
+        "severity": "boilerplate",
+        "clause_text": None,
+        "explanation": "After paying your claim, the insurer can pursue the responsible third party to recover costs. This is standard in every insurance policy and keeps premiums lower for everyone.",
+        "what_to_ask": "No action needed - this is standard. Just cooperate if your insurer pursues a third party after paying your claim."
+    })
+
     # Generate summary
     critical_count = len([r for r in red_flags if r['severity'] == 'critical'])
     if critical_count > 0:

@@ -73,12 +73,28 @@ def mock_gym_analysis(contract_text: str, state: str = None) -> dict:
     if 'freeze' not in text_lower and 'pause' not in text_lower:
         red_flags.append({
             "name": "No Freeze Option Mentioned",
-            "severity": "info",
+            "severity": "minor",
             "clause_text": None,
             "explanation": "The contract doesn't mention freezing your membership. If you get injured or travel, you may keep paying.",
             "protection": "Ask about freeze policies before signing. Most gyms offer this but hide it."
         })
         risk_score += 5
+
+    # Always add boilerplate
+    red_flags.append({
+        "name": "Standard Governing Law Clause",
+        "severity": "boilerplate",
+        "clause_text": None,
+        "explanation": "This contract is governed by the laws of your state. This is standard in every gym contract and protects both parties.",
+        "protection": "No action needed - this is normal."
+    })
+    red_flags.append({
+        "name": "Severability Provision",
+        "severity": "boilerplate",
+        "clause_text": None,
+        "explanation": "If one part of the contract is found invalid, the rest still applies. This is standard legal language that actually protects you too.",
+        "protection": "No action needed - this is standard and beneficial."
+    })
 
     # Get state protections
     state_protections = []

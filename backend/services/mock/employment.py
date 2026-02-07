@@ -72,11 +72,27 @@ def mock_employment_analysis(contract_text: str, state: str = None, salary: int 
     if 'at-will' in text_lower:
         red_flags.append({
             "name": "At-Will Employment",
-            "severity": "info",
+            "severity": "minor",
             "clause_text": "Employment is at-will and may be terminated at any time...",
             "explanation": "Standard language - they can fire you anytime for any legal reason (and you can quit anytime).",
             "protection": "This is normal. Focus on severance and notice period terms."
         })
+
+    # Always add boilerplate
+    red_flags.append({
+        "name": "Standard At-Will Employment Clause",
+        "severity": "boilerplate",
+        "clause_text": None,
+        "explanation": "At-will employment is the default in 49 out of 50 states. It means either party can end the relationship at any time. This is completely standard.",
+        "protection": "No action needed - this is standard employment law."
+    })
+    red_flags.append({
+        "name": "Severability Provision",
+        "severity": "boilerplate",
+        "clause_text": None,
+        "explanation": "If one part of the contract is found invalid, the rest still applies. This is standard legal language found in virtually every employment agreement.",
+        "protection": "No action needed - this is standard and beneficial."
+    })
 
     # Determine document type
     if 'offer' in text_lower and 'accept' in text_lower:

@@ -4,7 +4,7 @@ import { getRiskColor, getRiskLabel } from './utils'
 
 interface ContractRedFlag {
   name: string
-  severity: 'critical' | 'warning' | 'info'
+  severity: 'dealbreaker' | 'critical' | 'warning' | 'minor' | 'boilerplate'
   clause_text?: string
   explanation: string
   protection: string

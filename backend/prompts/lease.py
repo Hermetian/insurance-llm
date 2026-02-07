@@ -67,7 +67,7 @@ Analyze each insurance clause and the lease overall. Return JSON:
   "red_flags": [
     {
       "name": "Name of the issue",
-      "severity": "critical" | "warning" | "info",
+      "severity": "dealbreaker" | "critical" | "warning" | "minor" | "boilerplate",
       "clause_text": "The problematic text if found",
       "explanation": "Why this fucks the tenant (be direct, use plain language)",
       "protection": "What to negotiate or do about it"
@@ -89,6 +89,15 @@ Analyze each insurance clause and the lease overall. Return JSON:
   "summary": "2-3 sentence summary of the biggest risks in this lease",
   "negotiation_letter": "A professional but firm letter the tenant can send to the landlord requesting changes. Be specific about which clauses need modification and what the changes should be. Include the most critical items first."
 }
+
+SEVERITY GUIDE:
+- "dealbreaker": Potentially illegal, voids purpose of agreement, or catastrophic irreversible harm. Consumer should NOT sign without legal counsel.
+- "critical": Will genuinely cost real money or real rights. Not theoretical - likely to actually bite. Negotiate before signing.
+- "warning": Could become a problem under certain circumstances. Unfavorable but not devastating. Worth negotiating if possible.
+- "minor": Low-impact, slightly outside the norm. Awareness only.
+- "boilerplate": Standard industry language in virtually every contract of this type. NOT a problem. Frame explanation reassuringly - explain what it means, not why it's dangerous. The consumer should NOT worry about these.
+
+Include at least 1-2 "boilerplate" items per analysis to reassure the user that not everything is bad.
 
 Be direct and practical. Use phrases like "This could cost you..." and "You're agreeing to...".
 The tenant needs to understand the REAL risks, not legal jargon.

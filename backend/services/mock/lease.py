@@ -97,6 +97,22 @@ def mock_lease_analysis(lease_text: str, state: str = None) -> dict:
             "recommendation": "Verify your policy's aggregate limit"
         })
 
+    # Always add boilerplate
+    red_flags.append({
+        "name": "Standard Quiet Enjoyment Clause",
+        "severity": "boilerplate",
+        "clause_text": None,
+        "explanation": "The lease includes a quiet enjoyment clause guaranteeing your right to use the premises without interference from the landlord. This is standard in every lease and actually protects you.",
+        "protection": "No action needed - this is standard and beneficial to you as the tenant."
+    })
+    red_flags.append({
+        "name": "Governing Law Clause",
+        "severity": "boilerplate",
+        "clause_text": None,
+        "explanation": "The lease specifies which state's laws govern the agreement. This is standard boilerplate in every lease agreement.",
+        "protection": "No action needed - this is standard and expected."
+    })
+
     # Cap risk score
     risk_score = min(100, risk_score)
 

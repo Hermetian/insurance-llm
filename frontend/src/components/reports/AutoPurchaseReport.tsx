@@ -4,7 +4,7 @@ import { getRiskColor, getRiskLabel } from './utils'
 
 interface AutoPurchaseRedFlag {
   name: string
-  severity: 'critical' | 'warning' | 'info'
+  severity: 'dealbreaker' | 'critical' | 'warning' | 'minor' | 'boilerplate'
   clause_text?: string
   explanation: string
   what_to_ask: string

@@ -102,7 +102,7 @@ LEASE_RED_FLAGS = {
     "extraordinary_coverage": {
         "name": "Unusual Coverage Requirements",
         "keywords": ["terrorism", "pollution", "cyber", "earthquake", "flood"],
-        "severity": "info",
+        "severity": "minor",
         "explanation": "Some of these coverages may be expensive, unavailable, or inapplicable to your business.",
         "protection": "Only agree to coverage that's available, affordable, and applicable. Add 'if commercially available at reasonable cost'."
     }

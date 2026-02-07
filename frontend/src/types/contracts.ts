@@ -1,7 +1,7 @@
 // Generic RedFlag type used by new contract types
 export interface ContractRedFlag {
   name: string
-  severity: 'critical' | 'warning' | 'info'
+  severity: 'dealbreaker' | 'critical' | 'warning' | 'minor' | 'boilerplate'
   clause_text?: string
   explanation: string
   protection: string
@@ -86,7 +86,7 @@ export interface TimeshareContractReport {
 // Insurance Policy Types (with different protection field name)
 export interface InsurancePolicyRedFlag {
   name: string
-  severity: 'critical' | 'warning' | 'info'
+  severity: 'dealbreaker' | 'critical' | 'warning' | 'minor' | 'boilerplate'
   clause_text?: string
   explanation: string
   what_to_ask: string
@@ -110,7 +110,7 @@ export interface InsurancePolicyReport {
 // Red flag type using what_to_ask (used by auto purchase, home improvement, subscription, debt settlement)
 export interface ActionRedFlag {
   name: string
-  severity: 'critical' | 'warning' | 'info'
+  severity: 'dealbreaker' | 'critical' | 'warning' | 'minor' | 'boilerplate'
   clause_text?: string
   explanation: string
   what_to_ask: string
@@ -149,7 +149,7 @@ export interface HomeImprovementReport {
 // Nursing Home Agreement Types
 export interface NursingHomeRedFlag {
   name: string
-  severity: 'critical' | 'warning' | 'info'
+  severity: 'dealbreaker' | 'critical' | 'warning' | 'minor' | 'boilerplate'
   clause_text?: string
   explanation: string
   what_to_ask: string
